@@ -13,3 +13,6 @@ vendor/**
 
 # Executable
 /forum-server
+
+# Swagger ui
+/swagger-ui/
