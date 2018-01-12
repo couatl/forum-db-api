@@ -5,5 +5,11 @@
 /cmd/
 /models/
 /modules/assets/
-restapi/*
-!restapi/configure_*.go
+/restapi/*
+!/restapi/configure_*.go
+
+# Godep vendoring
+vendor/**
+
+# Executable
+/forum-server
