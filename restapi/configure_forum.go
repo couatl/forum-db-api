@@ -18,8 +18,6 @@ import (
 	"github.com/go-openapi/swag"
 )
 
-// This file is safe to edit. Once it exists it will not be overwritten
-
 //go:generate swagger generate server --target ../.. --name forum --spec ../swagger.yml
 //go:generate go-bindata -pkg assets_ui -o ../modules/assets/assets_ui/assets_ui.go -prefix ../swagger-ui/ ../swagger-ui/...
 //go:generate go-bindata -pkg assets_db -o ../modules/assets/assets_db/assets_db.go -prefix ../modules/assets/ ../modules/assets/...
@@ -37,14 +35,7 @@ func configureFlags(api *operations.ForumAPI) {
 }
 
 func configureAPI(api *operations.ForumAPI) http.Handler {
-	// configure the api here
 	api.ServeError = errors.ServeError
-
-	// Set your custom logger if needed. Default one is log.Printf
-	// Expected interface func(string, ...interface{})
-	//
-	// Example:
-	// api.Logger = log.Printf
 
 	api.JSONConsumer = runtime.JSONConsumer()
 
@@ -84,24 +75,15 @@ func configureAPI(api *operations.ForumAPI) http.Handler {
 
 // The TLS configuration before HTTPS server starts.
 func configureTLS(tlsConfig *tls.Config) {
-	// Make all necessary changes to the TLS configuration here.
 }
 
-// As soon as server is initialized but not run yet, this function will be called.
-// If you need to modify a config, store server instance to stop it individually later, this is the place.
-// This function can be called multiple times, depending on the number of serving schemes.
-// scheme value will be set accordingly: "http", "https" or "unix"
 func configureServer(s *graceful.Server, scheme, addr string) {
 }
 
-// The middleware configuration is for the handler executors. These do not apply to the swagger.json document.
-// The middleware executes after routing but before authentication, binding and validation
 func setupMiddlewares(handler http.Handler) http.Handler {
 	return handler
 }
 
-// The middleware configuration happens before anything, this middleware also applies to serving the swagger.json document.
-// So this is a good place to plug in a panic handling middleware, logging and metrics
 func setupGlobalMiddleware(handler http.Handler) http.Handler {
 	recovery := recover.New(&recover.Options{
 		Log: log.Print,
@@ -115,7 +97,7 @@ func uiMiddleware(handler http.Handler) http.Handler {
 			handler.ServeHTTP(w, r)
 			return
 		}
-		// Serving Swagger UI
+		// Swagger UI
 		if r.URL.Path == "/api/" {
 			r.URL.Path = "/api"
 		}
