@@ -1,0 +1,4 @@
+#!/bin/bash
+
+docker build -t forum-db-api -f Dockerfile .
+docker run -p 5000:5000 --name forum forum-db-api
