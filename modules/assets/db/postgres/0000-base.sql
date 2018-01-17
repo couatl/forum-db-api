@@ -1,24 +1,25 @@
--- +migrate Up
-
+-- +migrate Down
 DROP INDEX IF EXISTS users_nickname_index;
 DROP INDEX IF EXISTS users_email_index;
-
 DROP INDEX IF EXISTS forums_user_index;
 DROP INDEX IF EXISTS forums_slug_index;
-
 DROP INDEX IF EXISTS threads_slug_index;
 DROP INDEX IF EXISTS threads_forum_index;
 DROP INDEX IF EXISTS threads_owner_index;
-
 DROP INDEX IF EXISTS posts_thread_index;
 DROP INDEX IF EXISTS posts_parent_index;
 DROP INDEX IF EXISTS posts_author_index;
 DROP INDEX IF EXISTS posts_parent_path_index;
-
 DROP INDEX IF EXISTS votes_user_thread_index;
+DROP TABLE votes;
+DROP TABLE posts;
+DROP TABLE threads;
+DROP TABLE forums;
+DROP TABLE users;
 
 CREATE EXTENSION IF NOT EXISTS LTREE;
 
+-- +migrate Up
 CREATE TABLE IF NOT EXISTS users (
   id       BIGSERIAL NOT NULL PRIMARY KEY,
   about    TEXT,
@@ -26,13 +27,12 @@ CREATE TABLE IF NOT EXISTS users (
   fullname VARCHAR(64) NOT NULL,
   nickname TEXT UNIQUE NOT NULL
 );
-
 CREATE UNIQUE INDEX IF NOT EXISTS users_nickname_index
   ON users (nickname);
-
 CREATE UNIQUE INDEX IF NOT EXISTS users_email_index
   ON users (email);
 
+-- +migrate Up
 CREATE TABLE IF NOT EXISTS forums (
   id      BIGSERIAL NOT NULL PRIMARY KEY,
   slug    TEXT UNIQUE NOT NULL,
@@ -41,13 +41,12 @@ CREATE TABLE IF NOT EXISTS forums (
   posts   BIGINT  DEFAULT 0,
   threads INTEGER DEFAULT 0
 );
-
 CREATE INDEX IF NOT EXISTS forums_user_index
   ON forums (author);
-
 CREATE UNIQUE INDEX IF NOT EXISTS forums_slug_index
   ON forums (slug);
 
+-- +migrate Up
 CREATE TABLE IF NOT EXISTS threads (
   id        SERIAL PRIMARY KEY,
   forum     TEXT REFERENCES forums (slug),
@@ -58,16 +57,14 @@ CREATE TABLE IF NOT EXISTS threads (
   title     VARCHAR(255) NOT NULL,
   votes     INTEGER DEFAULT 0 NOT NULL
 );
-
 CREATE INDEX IF NOT EXISTS threads_slug_index
   ON threads (lower(slug));
-
 CREATE INDEX IF NOT EXISTS threads_forum_index
   ON threads (forum);
-
 CREATE INDEX IF NOT EXISTS threads_owner_index
   ON threads (author);
 
+-- +migrate Up
 CREATE TABLE IF NOT EXISTS posts (
   id        BIGSERIAL PRIMARY KEY,
   forum     TEXT REFERENCES forums (slug),
@@ -77,19 +74,14 @@ CREATE TABLE IF NOT EXISTS posts (
   is_edited BOOLEAN NOT NULL DEFAULT FALSE,
   message   TEXT NOT NULL,
   parent    BIGINT DEFAULT 0,
-  path      LTREE,
-  UNIQUE (parent, thread)
+  path      LTREE
 );
-
 CREATE INDEX IF NOT EXISTS posts_thread_index
   ON posts (thread);
-
 CREATE INDEX IF NOT EXISTS posts_parent_index
   ON posts (parent);
-
 CREATE INDEX IF NOT EXISTS posts_author_index
   ON posts (author);
-
 CREATE INDEX IF NOT EXISTS posts_path_index
   ON posts USING GIST (path);
 
@@ -122,12 +114,12 @@ ON posts
 FOR EACH ROW
 EXECUTE PROCEDURE update_parent_path();
 
+-- +migrate Up
 CREATE TABLE IF NOT EXISTS votes (
   id        SERIAL NOT NULL PRIMARY KEY,
   author    TEXT REFERENCES users (nickname),
   thread    BIGINT REFERENCES threads (id),
   voice     INTEGER NOT NULL
 );
-
 CREATE UNIQUE INDEX votes_user_thread_index
   ON votes (author, thread);
