@@ -8,6 +8,7 @@ import (
 // ForumHandler ...
 type ForumHandler interface {
 	Clear(params operations.ClearParams) middleware.Responder
+	Status(params operations.StatusParams) middleware.Responder
 
 	ForumCreate(params operations.ForumCreateParams) middleware.Responder
 	ForumGetOne(params operations.ForumGetOneParams) middleware.Responder
@@ -17,8 +18,6 @@ type ForumHandler interface {
 	PostGetOne(params operations.PostGetOneParams) middleware.Responder
 	PostUpdate(params operations.PostUpdateParams) middleware.Responder
 	PostsCreate(params operations.PostsCreateParams) middleware.Responder
-
-	Status(params operations.StatusParams) middleware.Responder
 
 	ThreadCreate(params operations.ThreadCreateParams) middleware.Responder
 	ThreadGetOne(params operations.ThreadGetOneParams) middleware.Responder
