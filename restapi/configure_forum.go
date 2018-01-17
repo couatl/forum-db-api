@@ -18,7 +18,7 @@ import (
 	"github.com/go-openapi/swag"
 )
 
-//go:generate swagger generate server --target ../.. --name forum --spec ../swagger.yml
+//go:generate swagger generate server --target .. --name forum --spec ../swagger.yml
 //go:generate go-bindata -pkg assets_ui -o ../modules/assets/assets_ui/assets_ui.go -prefix ../swagger-ui/ ../swagger-ui/...
 //go:generate go-bindata -pkg assets_db -o ../modules/assets/assets_db/assets_db.go -prefix ../modules/assets/ ../modules/assets/...
 
@@ -46,6 +46,7 @@ func configureAPI(api *operations.ForumAPI) http.Handler {
 	var handler service.ForumHandler = service.NewForum(dbFlags.Database)
 
 	api.ClearHandler = operations.ClearHandlerFunc(handler.Clear)
+	api.StatusHandler = operations.StatusHandlerFunc(handler.Status)
 
 	api.ForumCreateHandler = operations.ForumCreateHandlerFunc(handler.ForumCreate)
 	api.ForumGetOneHandler = operations.ForumGetOneHandlerFunc(handler.ForumGetOne)
@@ -55,8 +56,6 @@ func configureAPI(api *operations.ForumAPI) http.Handler {
 	api.PostGetOneHandler = operations.PostGetOneHandlerFunc(handler.PostGetOne)
 	api.PostUpdateHandler = operations.PostUpdateHandlerFunc(handler.PostUpdate)
 	api.PostsCreateHandler = operations.PostsCreateHandlerFunc(handler.PostsCreate)
-
-	api.StatusHandler = operations.StatusHandlerFunc(handler.Status)
 
 	api.ThreadCreateHandler = operations.ThreadCreateHandlerFunc(handler.ThreadCreate)
 	api.ThreadGetOneHandler = operations.ThreadGetOneHandlerFunc(handler.ThreadGetOne)
