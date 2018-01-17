@@ -4,7 +4,7 @@
 * Реализован API, описанный в [swagger.yml](https://tech-db-forum.bozaro.ru/)
 * Сервис использует PostgreSQL 9.6
 
-## Состав Docker-контейнеров
+## Сборка и запуск Docker-контейнеров
 Docker контейнера организованы по следующему приципу:
 
  * Приложение:
@@ -12,8 +12,6 @@ Docker контейнера организованы по следующему �
  * PostgreSQL:
    * использует и объявляет порт 5342 (http);
    * директории `/etc/postgresql`, `/var/log/postgresql`, `/var/lib/postgresql` объявлены как VOLUME для возможности сохранения БД.
-
-## Сборка и запуск
 
 Сборка и запуск контейнера:
 ```bash
@@ -26,16 +24,16 @@ docker run -p 5000:5000 --name forum forum-db-api
 docker kill forum
 ```
 
-Желающим запустить на своей машине:
-
-Если не установлены пакеты:
+## Сборка и запуск
+Установить пакеты:
 ```bash
 go install ./vendor/github.com/go-swagger/go-swagger/cmd/swagger
 go install ./vendor/github.com/jteeuwen/go-bindata/go-bindata
 ```
 
-Иначе:
+Затем:
 ```bash
 go generate -x ./restapi
 go install ./cmd/forum-server
+forum-server --scheme=http --port=5000 --host=0.0.0.0 --database=postgres://username:password@localhost/db_name?sslmode=disable
 ```
