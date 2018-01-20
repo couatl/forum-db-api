@@ -191,7 +191,7 @@ func (dbManager ForumPgSQL) ForumGetUsers(params operations.ForumGetUsersParams)
 	return operations.NewForumGetUsersOK().WithPayload(users)
 }
 
-// PostGetOne TODO Затестить
+// PostGetOne ... OK
 func (dbManager ForumPgSQL) PostGetOne(params operations.PostGetOneParams) middleware.Responder {
 	tx := dbManager.db.MustBegin()
 
@@ -259,13 +259,23 @@ func (dbManager ForumPgSQL) PostUpdate(params operations.PostUpdateParams) middl
 
 	post := models.Post{}
 
-	err := tx.Get(&post, "UPDATE posts SET is_edited = true, message = $1 WHERE id = $2 RETURNING id, forum, thread, created, author, is_edited as isEdited, message, parent ",
-		params.Post.Message, params.ID)
-
-	if err != nil {
-		log.Println(err)
-		tx.Rollback()
-		return operations.NewUserUpdateConflict().WithPayload(&models.Error{Message: ERR_NOT_FOUND})
+	query := `UPDATE posts SET is_edited = true`
+	if params.Post.Message != "" {
+		query += `, message = $1 WHERE id = $2 RETURNING id, forum, thread, created, author, is_edited as isEdited, message, parent `
+		err := tx.Get(&post, query, params.Post.Message, params.ID)
+		if err != nil {
+			log.Println(err)
+			tx.Rollback()
+			return operations.NewUserUpdateConflict().WithPayload(&models.Error{Message: ERR_NOT_FOUND})
+		}
+	} else {
+		query += ` WHERE id = $1 RETURNING id, forum, thread, created, author, is_edited as isEdited, message, parent `
+		err := tx.Get(&post, query, params.ID)
+		if err != nil {
+			log.Println(err)
+			tx.Rollback()
+			return operations.NewUserUpdateConflict().WithPayload(&models.Error{Message: ERR_NOT_FOUND})
+		}
 	}
 
 	tx.Commit()
