@@ -290,12 +290,10 @@ func (dbManager ForumPgSQL) PostsCreate(params operations.PostsCreateParams) mid
 	user := models.User{}
 
 	postID := ID{}
-	threadID := ID{}
 
 	slug, id := SlugID(params.SlugOrID)
 
-	err := tx.Get(&threadID, `SELECT id FROM threads WHERE lower(slug) = lower($1) OR id = $2`, slug, id)
-	tx.Get(&thread, `SELECT slug, forum FROM threads WHERE id = $1`, threadID.ID)
+	err := tx.Get(&thread, `SELECT id, slug, forum FROM threads WHERE lower(slug) = lower($1) OR id = $2`, slug, id)
 	if err != nil {
 		log.Println(err)
 		tx.Rollback()
@@ -320,7 +318,7 @@ func (dbManager ForumPgSQL) PostsCreate(params operations.PostsCreateParams) mid
 		}
 
 		if item.Parent != 0 {
-			errNotFound := tx.Get(&postID, checkQuery, threadID.ID, item.Parent)
+			errNotFound := tx.Get(&postID, checkQuery, thread.ID, item.Parent)
 			if errNotFound != nil {
 				log.Println(errNotFound)
 				tx.Rollback()
@@ -332,7 +330,7 @@ func (dbManager ForumPgSQL) PostsCreate(params operations.PostsCreateParams) mid
 			insertQuery += ","
 		}
 
-		insertQuery += "('" + thread.Forum + "', " + strconv.FormatInt(int64(threadID.ID), 10) +
+		insertQuery += "('" + thread.Forum + "', " + strconv.FormatInt(int64(thread.ID), 10) +
 			", '" + item.Author + "', '" + item.Message + "', " + strconv.FormatInt(item.Parent, 10) + ")"
 	}
 	insertQuery += " RETURNING author, created, forum, id, is_edited as isEdited, message, thread, parent"
@@ -635,6 +633,8 @@ func (dbManager ForumPgSQL) ThreadVote(params operations.ThreadVoteParams) middl
 		_, errAlreadyExists := tx.Exec(`INSERT INTO votes (voice, author, thread) VALUES ($1, $2, $3)`,
 			params.Vote.Voice, params.Vote.Nickname, threadID.ID)
 
+		tx.Get(&thread, `UPDATE threads SET votes = votes + $1 WHERE id = $2 RETURNING *`, params.Vote.Voice, threadID.ID)
+
 		if errAlreadyExists != nil {
 			log.Println(errAlreadyExists)
 			tx.Rollback()
@@ -644,15 +644,15 @@ func (dbManager ForumPgSQL) ThreadVote(params operations.ThreadVoteParams) middl
 		_, errNotFound := tx.Exec(`UPDATE votes SET voice = $1 WHERE lower(author) = lower($2) AND thread = $3`,
 			params.Vote.Voice, params.Vote.Nickname, threadID.ID)
 
+		tx.Get(&thread, `UPDATE threads SET votes = (SELECT SUM(voice) FROM votes WHERE thread = $1)
+									WHERE id = $1 RETURNING *`, threadID.ID)
+
 		if errNotFound != nil {
 			log.Println(errNotFound)
 			tx.Rollback()
 			return operations.NewThreadVoteNotFound().WithPayload(&models.Error{Message: ERR_NOT_FOUND})
 		}
 	}
-
-	tx.Get(&thread, `UPDATE threads SET votes = (SELECT SUM(voice) FROM votes WHERE thread = $1)
-                WHERE id = $1 RETURNING *`, threadID.ID)
 
 	tx.Commit()
 	return operations.NewThreadVoteOK().WithPayload(&thread)
