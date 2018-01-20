@@ -259,22 +259,21 @@ func (dbManager ForumPgSQL) PostUpdate(params operations.PostUpdateParams) middl
 
 	post := models.Post{}
 
-	query := `UPDATE posts SET is_edited = true`
-	if params.Post.Message != "" {
-		query += `, message = $1 WHERE id = $2 RETURNING id, forum, thread, created, author, is_edited as isEdited, message, parent `
-		err := tx.Get(&post, query, params.Post.Message, params.ID)
+	err := tx.Get(&post, "SELECT id, forum, thread, created, author, is_edited as isEdited, message, parent FROM posts WHERE id = $1", params.ID)
+	if err != nil {
+		log.Println(err)
+		tx.Rollback()
+		return operations.NewPostUpdateNotFound().WithPayload(&models.Error{Message: ERR_NOT_FOUND})
+	}
+
+	if params.Post.Message != "" && params.Post.Message != post.Message {
+		err := tx.Get(&post, `UPDATE posts SET is_edited = true, message = $1
+			WHERE id = $2
+			RETURNING id, forum, thread, created, author, is_edited as isEdited, message, parent `, params.Post.Message, params.ID)
 		if err != nil {
 			log.Println(err)
 			tx.Rollback()
-			return operations.NewUserUpdateConflict().WithPayload(&models.Error{Message: ERR_NOT_FOUND})
-		}
-	} else {
-		query += ` WHERE id = $1 RETURNING id, forum, thread, created, author, is_edited as isEdited, message, parent `
-		err := tx.Get(&post, query, params.ID)
-		if err != nil {
-			log.Println(err)
-			tx.Rollback()
-			return operations.NewUserUpdateConflict().WithPayload(&models.Error{Message: ERR_NOT_FOUND})
+			return operations.NewPostUpdateNotFound().WithPayload(&models.Error{Message: ERR_NOT_FOUND})
 		}
 	}
 
