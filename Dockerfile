@@ -1,8 +1,8 @@
-FROM ubuntu:17.04
+FROM ubuntu:16.04
 
-RUN apt-get -y update
+RUN apt-get update
 
-ENV PGVER 9.6
+ENV PGVER 9.5
 RUN apt-get install -y postgresql-$PGVER
 
 USER postgres
@@ -22,7 +22,6 @@ VOLUME  ["/etc/postgresql", "/var/log/postgresql", "/var/lib/postgresql"]
 
 USER root
 
-RUN apt-get update
 RUN apt install -y golang-1.8 git
 
 ENV GOROOT /usr/lib/go-1.8
