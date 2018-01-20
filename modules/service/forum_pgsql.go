@@ -259,7 +259,7 @@ func (dbManager ForumPgSQL) PostUpdate(params operations.PostUpdateParams) middl
 	return operations.NewPostUpdateOK().WithPayload(&post)
 }
 
-// PostsCreate OK
+// PostsCreate OK OK
 func (dbManager ForumPgSQL) PostsCreate(params operations.PostsCreateParams) middleware.Responder {
 	tx := dbManager.db.MustBegin()
 
@@ -290,11 +290,11 @@ func (dbManager ForumPgSQL) PostsCreate(params operations.PostsCreateParams) mid
 		log.Println(item.Parent)
 
 		if item.Parent != 0 {
-			errNotFound := tx.Get(&postID, checkQuery, thread.Slug, item.Parent)
+			errNotFound := tx.Get(&postID, checkQuery, threadID.ID, item.Parent)
 			if errNotFound != nil {
 				log.Println(errNotFound)
 				tx.Rollback()
-				return operations.NewPostsCreateNotFound().WithPayload(&models.Error{Message: ERR_NOT_FOUND})
+				return operations.NewPostsCreateConflict().WithPayload(&models.Error{Message: ERR_NOT_FOUND})
 			}
 		}
 
@@ -394,7 +394,7 @@ func (dbManager ForumPgSQL) ThreadGetOne(params operations.ThreadGetOneParams) m
 	return operations.NewThreadGetOneOK().WithPayload(&thread)
 }
 
-// ThreadGetPosts ... NOT READY
+// ThreadGetPosts ... OK
 func (dbManager ForumPgSQL) ThreadGetPosts(params operations.ThreadGetPostsParams) middleware.Responder {
 	tx := dbManager.db.MustBegin()
 
@@ -409,7 +409,7 @@ func (dbManager ForumPgSQL) ThreadGetPosts(params operations.ThreadGetPostsParam
 		return operations.NewThreadGetPostsNotFound().WithPayload(&models.Error{Message: ERR_NOT_FOUND})
 	}
 
-	query := `SELECT * from posts WHERE thread = $1`
+	query := `SELECT id, forum, thread, author, created, is_edited as isEdited, message, parent from posts WHERE thread = $1`
 
 	desc := params.Desc != nil && *params.Desc
 	limit := strconv.FormatInt(int64(*params.Limit), 10)
@@ -433,8 +433,6 @@ func (dbManager ForumPgSQL) ThreadGetPosts(params operations.ThreadGetPostsParam
 		if params.Limit != nil {
 			query += ` LIMIT ` + limit
 		}
-
-		log.Println(query)
 
 		if params.Since != nil {
 			err := tx.Select(&posts, query, threadID.ID, params.Since)
@@ -476,8 +474,6 @@ func (dbManager ForumPgSQL) ThreadGetPosts(params operations.ThreadGetPostsParam
 			query += ` LIMIT ` + limit
 		}
 
-		log.Println(query)
-
 		if params.Since != nil {
 			err := tx.Select(&posts, query, threadID.ID, params.Since)
 			if err != nil {
@@ -495,50 +491,57 @@ func (dbManager ForumPgSQL) ThreadGetPosts(params operations.ThreadGetPostsParam
 		}
 	}
 	if *params.Sort == "parent_tree" {
-		//
-		// parents := []int64{}
-		//
-		// queryParent := `SELECT id from posts WHERE thread = $1 AND parent = 0`
-		// if params.Since != nil {
-		// 	queryParent += ` AND path[1] `
-		// 	if desc {
-		// 		queryParent += ` < `
-		// 	} else {
-		// 		queryParent += ` > `
-		// 	}
-		// 	queryParent += `(SELECT path[1] FROM posts WHERE id = $2) `
-		// }
-		//
-		// if desc {
-		// 	queryParent += ` ORDER BY id DESC`
-		// } else {
-		// 	queryParent += ` ORDER BY id`
-		// }
-		//
-		// if params.Limit != nil {
-		// 	queryParent += ` LIMIT ` + limit
-		// }
-		//
-		// tx.Select(&parents, queryParent, int64(thread.ID), *params.Since)
-		//
-		// query += ` AND path[1] = $2`
-		//
-		// if params.Since != nil {
-		// 	query += ` AND path[1] `
-		// 	if desc {
-		// 		query += ` < `
-		// 	} else {
-		// 		query += ` > `
-		// 	}
-		// 	query += `(SELECT path[1] FROM posts WHERE id = ` + since + ` ) `
-		// }
-		//
-		// if desc {
-		// 	query += ` ORDER BY path DESC, id DESC`
-		// } else {
-		// 	query += ` ORDER BY path, id`
-		// }
+		query += ` AND subltree(path, 0, 1) IN (SELECT p1.path FROM posts p1
+			WHERE nlevel(p1.path) = 1 AND p1.thread = $1 `
+		if params.Since != nil {
+			query += ` AND path `
+			if desc {
+				query += ` < `
+			} else {
+				query += ` > `
+			}
+			query += `(SELECT p2.path FROM posts p2 WHERE p2.id = $2) `
+		}
 
+		query += ` ORDER BY string_to_array(subltree(posts.path, 0, 1)::text,'.')::integer[]`
+		if desc {
+			query += ` DESC `
+		}
+		query += `, string_to_array(p1.path::text,'.')::integer[] `
+		if desc {
+			query += ` DESC `
+		}
+
+		if params.Limit != nil {
+			query += ` LIMIT ` + limit
+		}
+
+		query += `) ORDER BY string_to_array(posts.path::text,'.')::integer[] `
+		if desc {
+			query += ` DESC `
+		}
+		query += `, string_to_array(posts.path::text,'.')::integer[] `
+		if desc {
+			query += ` DESC `
+		}
+
+		log.Println(query)
+
+		if params.Since != nil {
+			err := tx.Select(&posts, query, threadID.ID, params.Since)
+			if err != nil {
+				log.Println(err)
+				tx.Rollback()
+				return operations.NewThreadGetPostsNotFound().WithPayload(&models.Error{Message: ERR})
+			}
+		} else {
+			err := tx.Select(&posts, query, threadID.ID)
+			if err != nil {
+				log.Println(err)
+				tx.Rollback()
+				return operations.NewThreadGetPostsNotFound().WithPayload(&models.Error{Message: ERR})
+			}
+		}
 	}
 
 	tx.Commit()
