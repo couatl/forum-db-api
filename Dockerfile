@@ -8,7 +8,7 @@ RUN apt-get install -y postgresql-$PGVER
 USER postgres
 
 RUN /etc/init.d/postgresql start &&\
-    psql --command "CREATE USER docker WITH SUPERUSER PASSWORD 'docker';" &&\
+    psql --command "CREATE USER docker WITH SUPERUSER PASSWORD 'docker'; CREATE EXTENSION ltree;" &&\
     createdb -O docker docker &&\
     /etc/init.d/postgresql stop
 
@@ -22,11 +22,14 @@ VOLUME  ["/etc/postgresql", "/var/log/postgresql", "/var/lib/postgresql"]
 
 USER root
 
-RUN apt install -y golang-1.8 git
+# RUN apt-get install -y golang git
 
-ENV GOROOT /usr/lib/go-1.8
-ENV GOPATH /opt/go
-ENV PATH $GOROOT/bin:$GOPATH/bin:/usr/local/go/bin:$PATH
+RUN apt-get install -y wget git
+RUN wget https://storage.googleapis.com/golang/go1.9.2.linux-amd64.tar.gz
+RUN tar -C /usr/local -xzf go1.9.2.linux-amd64.tar.gz && mkdir go && mkdir go/src && mkdir go/bin && mkdir go/pkg
+
+ENV GOPATH $HOME/go
+ENV PATH $GOPATH/bin:/usr/local/go/bin:$PATH
 
 WORKDIR $GOPATH/src/github.com/couatl/forum-db-api
 ADD . $GOPATH/src/github.com/couatl/forum-db-api

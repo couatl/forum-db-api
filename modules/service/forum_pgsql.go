@@ -34,7 +34,7 @@ func (dbManager ForumPgSQL) Clear(params operations.ClearParams) middleware.Resp
 	tx := dbManager.db.MustBegin()
 	defer tx.Rollback()
 
-	_, err := tx.Exec(`TRUNCATE TABLE votes, posts, threads, forums, users`)
+	_, err := tx.Exec(`TRUNCATE TABLE forums, threads, users, posts CASCADE`)
 	check(err)
 	check(tx.Commit())
 
