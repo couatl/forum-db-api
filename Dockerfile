@@ -5,10 +5,16 @@ RUN apt-get update
 ENV PGVER 9.5
 RUN apt-get install -y postgresql-$PGVER
 
+# RUN apt-get install -y golang git
+
+RUN apt-get install -y wget git
+RUN wget https://storage.googleapis.com/golang/go1.9.2.linux-amd64.tar.gz
+RUN tar -C /usr/local -xzf go1.9.2.linux-amd64.tar.gz && mkdir go && mkdir go/src && mkdir go/bin && mkdir go/pkg
+
 USER postgres
 
 RUN /etc/init.d/postgresql start &&\
-    psql --command "CREATE USER docker WITH SUPERUSER PASSWORD 'docker'; CREATE EXTENSION ltree;" &&\
+    psql -c "CREATE USER docker WITH SUPERUSER PASSWORD 'docker';" &&\
     createdb -O docker docker &&\
     /etc/init.d/postgresql stop
 
@@ -21,12 +27,6 @@ EXPOSE 5432
 VOLUME  ["/etc/postgresql", "/var/log/postgresql", "/var/lib/postgresql"]
 
 USER root
-
-# RUN apt-get install -y golang git
-
-RUN apt-get install -y wget git
-RUN wget https://storage.googleapis.com/golang/go1.9.2.linux-amd64.tar.gz
-RUN tar -C /usr/local -xzf go1.9.2.linux-amd64.tar.gz && mkdir go && mkdir go/src && mkdir go/bin && mkdir go/pkg
 
 ENV GOPATH $HOME/go
 ENV PATH $GOPATH/bin:/usr/local/go/bin:$PATH
