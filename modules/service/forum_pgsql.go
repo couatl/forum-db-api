@@ -287,8 +287,6 @@ func (dbManager ForumPgSQL) PostsCreate(params operations.PostsCreateParams) mid
 
 	insertQuery := "INSERT INTO posts (forum, thread, author, message, parent) VALUES "
 	for idx, item := range params.Posts {
-		log.Println(item.Parent)
-
 		if item.Parent != 0 {
 			errNotFound := tx.Get(&postID, checkQuery, threadID.ID, item.Parent)
 			if errNotFound != nil {
@@ -372,6 +370,7 @@ func (dbManager ForumPgSQL) ThreadCreate(params operations.ThreadCreateParams) m
 		return operations.NewThreadCreateNotFound().WithPayload(&models.Error{Message: ERR})
 	}
 
+	tx.MustExec("UPDATE forums SET threads = threads + 1 WHERE slug = $1", forum.Slug)
 	tx.Commit()
 	return operations.NewThreadCreateCreated().WithPayload(&thread)
 }
@@ -525,8 +524,6 @@ func (dbManager ForumPgSQL) ThreadGetPosts(params operations.ThreadGetPostsParam
 			query += ` DESC `
 		}
 
-		log.Println(query)
-
 		if params.Since != nil {
 			err := tx.Select(&posts, query, threadID.ID, params.Since)
 			if err != nil {
@@ -556,7 +553,7 @@ func (dbManager ForumPgSQL) ThreadUpdate(params operations.ThreadUpdateParams) m
 	thread := models.Thread{}
 
 	slug, id := SlugID(params.SlugOrID)
-	err := tx.Get(&threadID, `SELECT id FROM threads WHERE slug = $1 OR id = $2`, slug, id)
+	err := tx.Get(&threadID, `SELECT id FROM threads WHERE lower(slug) = lower($1) OR id = $2`, slug, id)
 	if err != nil {
 		log.Println(err)
 		tx.Rollback()
