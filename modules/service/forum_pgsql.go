@@ -34,7 +34,7 @@ func (dbManager ForumPgSQL) Clear(params operations.ClearParams) middleware.Resp
 	tx := dbManager.db.MustBegin()
 	defer tx.Rollback()
 
-	_, err := tx.Exec(`TRUNCATE TABLE forums, posts, threads, users, votes CASCADE`)
+	_, err := tx.Exec(`TRUNCATE TABLE votes, posts, threads, forums, users`)
 	check(err)
 	check(tx.Commit())
 
@@ -87,7 +87,6 @@ func (dbManager ForumPgSQL) ForumGetOne(params operations.ForumGetOneParams) mid
 		return operations.NewForumGetOneNotFound().WithPayload(&models.Error{Message: ERR_NOT_FOUND})
 	}
 
-	log.Println(forum)
 	tx.Commit()
 	return operations.NewForumGetOneOK().WithPayload(&forum)
 }
@@ -172,8 +171,6 @@ func (dbManager ForumPgSQL) ForumGetUsers(params operations.ForumGetUsersParams)
 		query += ` LIMIT ` + strconv.FormatInt(int64(*params.Limit), 10)
 	}
 
-	log.Println(query)
-
 	if params.Since != nil {
 		errUnexpected := tx.Select(&users, query, forum.Slug, *params.Since)
 		if errUnexpected != nil {
@@ -201,7 +198,8 @@ func (dbManager ForumPgSQL) PostGetOne(params operations.PostGetOneParams) middl
 	post := models.Post{}
 	postFull := models.PostFull{}
 
-	err := tx.Get(&post, `SELECT * FROM posts WHERE id = $1`, params.ID)
+	err := tx.Get(&post, `SELECT id, forum, thread, author, created, is_edited as isEdited,
+		message, parent FROM posts WHERE id = $1`, params.ID)
 
 	if err != nil {
 		log.Println(err)
@@ -219,6 +217,7 @@ func (dbManager ForumPgSQL) PostGetOne(params operations.PostGetOneParams) middl
 
 			if errUnexpected != nil {
 				log.Println(errUnexpected)
+				tx.Rollback()
 			}
 			postFull.Author = &user
 			continue
@@ -230,6 +229,7 @@ func (dbManager ForumPgSQL) PostGetOne(params operations.PostGetOneParams) middl
 
 			if errUnexpected2 != nil {
 				log.Println(errUnexpected2)
+				tx.Rollback()
 			}
 			postFull.Forum = &forum
 
@@ -241,6 +241,7 @@ func (dbManager ForumPgSQL) PostGetOne(params operations.PostGetOneParams) middl
 
 			if errUnexpected3 != nil {
 				log.Println(errUnexpected3)
+				tx.Rollback()
 			}
 			postFull.Thread = &thread
 
@@ -252,13 +253,13 @@ func (dbManager ForumPgSQL) PostGetOne(params operations.PostGetOneParams) middl
 	return operations.NewPostGetOneOK().WithPayload(&postFull)
 }
 
-// PostUpdate TODO Затестить
+// PostUpdate OK
 func (dbManager ForumPgSQL) PostUpdate(params operations.PostUpdateParams) middleware.Responder {
 	tx := dbManager.db.MustBegin()
 
 	post := models.Post{}
 
-	err := tx.Get(&post, "UPDATE posts SET is_edited = true, message = $1 WHERE id = $2 RETURNING *",
+	err := tx.Get(&post, "UPDATE posts SET is_edited = true, message = $1 WHERE id = $2 RETURNING id, forum, thread, created, author, is_edited as isEdited, message, parent ",
 		params.Post.Message, params.ID)
 
 	if err != nil {
@@ -277,6 +278,7 @@ func (dbManager ForumPgSQL) PostsCreate(params operations.PostsCreateParams) mid
 
 	thread := models.Thread{}
 	posts := models.Posts{}
+	user := models.User{}
 
 	postID := ID{}
 	threadID := ID{}
@@ -292,13 +294,22 @@ func (dbManager ForumPgSQL) PostsCreate(params operations.PostsCreateParams) mid
 	}
 
 	if len(params.Posts) == 0 {
+		tx.Commit()
 		return operations.NewPostsCreateCreated().WithPayload(params.Posts)
 	}
 
 	checkQuery := "SELECT id FROM posts WHERE thread = $1 AND id = $2"
+	checkUser := "SELECT nickname FROM users WHERE lower(nickname) = lower($1)"
 
 	insertQuery := "INSERT INTO posts (forum, thread, author, message, parent) VALUES "
 	for idx, item := range params.Posts {
+		errUserNotFound := tx.Get(&user, checkUser, item.Author)
+		if errUserNotFound != nil {
+			log.Println(errUserNotFound)
+			tx.Rollback()
+			return operations.NewPostsCreateNotFound().WithPayload(&models.Error{Message: ERR_NOT_FOUND})
+		}
+
 		if item.Parent != 0 {
 			errNotFound := tx.Get(&postID, checkQuery, threadID.ID, item.Parent)
 			if errNotFound != nil {
@@ -572,10 +583,16 @@ func (dbManager ForumPgSQL) ThreadUpdate(params operations.ThreadUpdateParams) m
 		return operations.NewThreadUpdateNotFound().WithPayload(&models.Error{Message: ERR_NOT_FOUND})
 	}
 
-	errNotFound := tx.Get(&thread, `UPDATE threads SET message = COALESCE($1, message), title = COALESCE($2, title)
-	WHERE id = $3 RETURNING *`,
-		params.Thread.Message, params.Thread.Title, threadID.ID)
+	query := `UPDATE threads SET id = id `
+	if params.Thread.Message != "" {
+		query += `, message = '` + params.Thread.Message + `' `
+	}
+	if params.Thread.Title != "" {
+		query += `, title = '` + params.Thread.Title + `' `
+	}
+	query += ` WHERE id = $1 RETURNING *`
 
+	errNotFound := tx.Get(&thread, query, threadID.ID)
 	if errNotFound != nil {
 		log.Println(errNotFound)
 		tx.Rollback()
@@ -604,11 +621,15 @@ func (dbManager ForumPgSQL) ThreadVote(params operations.ThreadVoteParams) middl
 
 	errExist := tx.Get(&voteID, `SELECT id FROM votes WHERE lower(author) = lower($1) AND thread = $2`, params.Vote.Nickname, threadID.ID)
 	if errExist != nil {
+		log.Println(errExist)
+
 		_, errAlreadyExists := tx.Exec(`INSERT INTO votes (voice, author, thread) VALUES ($1, $2, $3)`,
 			params.Vote.Voice, params.Vote.Nickname, threadID.ID)
 
 		if errAlreadyExists != nil {
 			log.Println(errAlreadyExists)
+			tx.Rollback()
+			return operations.NewThreadVoteNotFound().WithPayload(&models.Error{Message: ERR_NOT_FOUND})
 		}
 	} else {
 		_, errNotFound := tx.Exec(`UPDATE votes SET voice = $1 WHERE lower(author) = lower($2) AND thread = $3`,
@@ -616,6 +637,8 @@ func (dbManager ForumPgSQL) ThreadVote(params operations.ThreadVoteParams) middl
 
 		if errNotFound != nil {
 			log.Println(errNotFound)
+			tx.Rollback()
+			return operations.NewThreadVoteNotFound().WithPayload(&models.Error{Message: ERR_NOT_FOUND})
 		}
 	}
 
@@ -636,6 +659,7 @@ func (dbManager ForumPgSQL) UserCreate(params operations.UserCreateParams) middl
 	tx.Select(&users, "SELECT nickname, fullname, about, email FROM users WHERE lower(users.nickname) = lower($1) OR lower(users.email) = lower($2)", params.Nickname, params.Profile.Email)
 
 	if len(users) != 0 {
+		tx.Rollback()
 		return operations.NewUserCreateConflict().WithPayload(users)
 	}
 
@@ -681,6 +705,7 @@ func (dbManager ForumPgSQL) UserUpdate(params operations.UserUpdateParams) middl
 	}
 
 	if params.Profile == nil {
+		tx.Rollback()
 		return operations.NewUserUpdateOK().WithPayload(users[0])
 	}
 
