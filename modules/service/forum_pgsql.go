@@ -3,6 +3,7 @@ package service
 import (
 	"log"
 	"strconv"
+	"time"
 
 	"github.com/couatl/forum-db-api/models"
 	"github.com/couatl/forum-db-api/restapi/operations"
@@ -91,7 +92,7 @@ func (dbManager ForumPgSQL) ForumGetOne(params operations.ForumGetOneParams) mid
 	return operations.NewForumGetOneOK().WithPayload(&forum)
 }
 
-//ForumGetThreads ... OK OK
+//ForumGetThreads ... OPTIMIZ
 func (dbManager ForumPgSQL) ForumGetThreads(params operations.ForumGetThreadsParams) middleware.Responder {
 	tx := dbManager.db.MustBegin()
 
@@ -134,12 +135,14 @@ func (dbManager ForumPgSQL) ForumGetThreads(params operations.ForumGetThreadsPar
 	return operations.NewForumGetThreadsOK().WithPayload(threads)
 }
 
-//ForumGetUsers ... OK
+//ForumGetUsers ... !! OPTIMIZ
 func (dbManager ForumPgSQL) ForumGetUsers(params operations.ForumGetUsersParams) middleware.Responder {
 	tx := dbManager.db.MustBegin()
 
 	forum := models.Forum{}
 	users := models.Users{}
+
+	start := time.Now()
 
 	err := tx.Get(&forum, `SELECT slug FROM forums WHERE lower(slug) = lower($1)`, params.Slug)
 	if err != nil {
@@ -148,10 +151,8 @@ func (dbManager ForumPgSQL) ForumGetUsers(params operations.ForumGetUsersParams)
 		return operations.NewForumGetUsersNotFound().WithPayload(&models.Error{Message: ERR_NOT_FOUND})
 	}
 
-	query := `SELECT  DISTINCT ON (lower(users.nickname)) users.about, users.email, users.fullname, users.nickname
-	 FROM users LEFT JOIN posts ON (users.nickname = posts.author AND posts.forum = $1)
-	 LEFT JOIN threads ON (users.nickname = threads.author AND threads.forum = $1)
-	 WHERE (posts.forum = $1 OR threads.forum = $1) `
+	query := `SELECT about, email, fullname, nickname FROM users
+	WHERE users.nickname IN (SELECT nickname FROM forum_users WHERE slug = $1)`
 
 	desc := params.Desc != nil && *params.Desc
 	if params.Since != nil {
@@ -186,12 +187,12 @@ func (dbManager ForumPgSQL) ForumGetUsers(params operations.ForumGetUsersParams)
 			return operations.NewForumGetUsersNotFound().WithPayload(&models.Error{Message: ERR})
 		}
 	}
-
+	execTime(start, `GetUsers`)
 	tx.Commit()
 	return operations.NewForumGetUsersOK().WithPayload(users)
 }
 
-// PostGetOne ... OK
+// PostGetOne ... OPTIMIZ
 func (dbManager ForumPgSQL) PostGetOne(params operations.PostGetOneParams) middleware.Responder {
 	tx := dbManager.db.MustBegin()
 
@@ -405,7 +406,7 @@ func (dbManager ForumPgSQL) ThreadCreate(params operations.ThreadCreateParams) m
 	return operations.NewThreadCreateCreated().WithPayload(&thread)
 }
 
-// ThreadGetOne ... OK
+// ThreadGetOne ... OPTIMIZ
 func (dbManager ForumPgSQL) ThreadGetOne(params operations.ThreadGetOneParams) middleware.Responder {
 	tx := dbManager.db.MustBegin()
 
@@ -423,9 +424,11 @@ func (dbManager ForumPgSQL) ThreadGetOne(params operations.ThreadGetOneParams) m
 	return operations.NewThreadGetOneOK().WithPayload(&thread)
 }
 
-// ThreadGetPosts ... OK
+// ThreadGetPosts ... !!!!!! OPTIMIZ
 func (dbManager ForumPgSQL) ThreadGetPosts(params operations.ThreadGetPostsParams) middleware.Responder {
 	tx := dbManager.db.MustBegin()
+
+	start := time.Now()
 
 	threadID := ID{}
 	posts := models.Posts{}
@@ -438,25 +441,25 @@ func (dbManager ForumPgSQL) ThreadGetPosts(params operations.ThreadGetPostsParam
 		return operations.NewThreadGetPostsNotFound().WithPayload(&models.Error{Message: ERR_NOT_FOUND})
 	}
 
-	query := `SELECT id, forum, thread, author, created, is_edited as isEdited, message, parent from posts WHERE thread = $1`
+	query := `SELECT id, forum, thread, author, created, is_edited as isEdited, message, parent FROM posts WHERE`
 
 	desc := params.Desc != nil && *params.Desc
 	limit := strconv.FormatInt(int64(*params.Limit), 10)
 
 	if *params.Sort == "flat" {
+		query += ` thread = $1`
 		if params.Since != nil {
-			query += ` AND id `
 			if desc {
-				query += ` < $2`
+				query += ` AND id < $2`
 			} else {
-				query += ` > $2`
+				query += ` AND id > $2`
 			}
 		}
 
 		if desc {
-			query += ` ORDER BY created DESC, id DESC`
+			query += ` ORDER BY id DESC`
 		} else {
-			query += ` ORDER BY created, id`
+			query += ` ORDER BY id`
 		}
 
 		if params.Limit != nil {
@@ -480,23 +483,19 @@ func (dbManager ForumPgSQL) ThreadGetPosts(params operations.ThreadGetPostsParam
 		}
 	}
 	if *params.Sort == "tree" {
+		query += ` thread = $1`
 		if params.Since != nil {
-			query += ` AND path `
 			if desc {
-				query += ` < `
+				query += ` AND path < (SELECT path FROM posts WHERE id = $2)`
 			} else {
-				query += ` > `
+				query += ` AND path > (SELECT path FROM posts WHERE id = $2)`
 			}
-			query += `(SELECT path FROM posts WHERE id = $2) `
 		}
 
-		query += ` ORDER BY string_to_array(subltree(posts.path, 0, 1)::text,'.')::integer[]`
 		if desc {
-			query += ` DESC `
-		}
-		query += `, string_to_array(posts.path::text,'.')::integer[] `
-		if desc {
-			query += ` DESC `
+			query += ` ORDER BY path DESC`
+		} else {
+			query += ` ORDER BY path`
 		}
 
 		if params.Limit != nil {
@@ -520,38 +519,24 @@ func (dbManager ForumPgSQL) ThreadGetPosts(params operations.ThreadGetPostsParam
 		}
 	}
 	if *params.Sort == "parent_tree" {
-		query += ` AND subltree(path, 0, 1) IN (SELECT p1.path FROM posts p1
-			WHERE nlevel(p1.path) = 1 AND p1.thread = $1 `
+		query += ` root_id IN (SELECT id FROM posts WHERE thread = $1 AND parent = 0`
 		if params.Since != nil {
-			query += ` AND path `
 			if desc {
-				query += ` < `
+				query += ` AND path < (SELECT path FROM posts WHERE id = $2)`
 			} else {
-				query += ` > `
+				query += ` AND path > (SELECT path FROM posts WHERE id = $2)`
 			}
-			query += `(SELECT p2.path FROM posts p2 WHERE p2.id = $2) `
 		}
 
-		query += ` ORDER BY string_to_array(subltree(posts.path, 0, 1)::text,'.')::integer[]`
-		if desc {
-			query += ` DESC `
-		}
-		query += `, string_to_array(p1.path::text,'.')::integer[] `
-		if desc {
-			query += ` DESC `
-		}
-
+		limitStr := ""
 		if params.Limit != nil {
-			query += ` LIMIT ` + limit
+			limitStr = ` LIMIT ` + limit
 		}
 
-		query += `) ORDER BY string_to_array(posts.path::text,'.')::integer[] `
 		if desc {
-			query += ` DESC `
-		}
-		query += `, string_to_array(posts.path::text,'.')::integer[] `
-		if desc {
-			query += ` DESC `
+			query += ` ORDER BY id DESC ` + limitStr + `) ORDER BY path DESC`
+		} else {
+			query += ` ORDER BY id ` + limitStr + `) ORDER BY path`
 		}
 
 		if params.Since != nil {
@@ -570,6 +555,8 @@ func (dbManager ForumPgSQL) ThreadGetPosts(params operations.ThreadGetPostsParam
 			}
 		}
 	}
+
+	execTime(start, `GetPosts`)
 
 	tx.Commit()
 	return operations.NewThreadGetPostsOK().WithPayload(posts)
@@ -679,7 +666,7 @@ func (dbManager ForumPgSQL) UserCreate(params operations.UserCreateParams) middl
 	return operations.NewUserCreateCreated().WithPayload(&user)
 }
 
-//UserGetOne ... OK OK
+//UserGetOne ... OPTIMIZ
 func (dbManager ForumPgSQL) UserGetOne(params operations.UserGetOneParams) middleware.Responder {
 	tx := dbManager.db.MustBegin()
 	defer tx.Rollback()
@@ -743,4 +730,9 @@ func SlugID(slugOrID string) (string, int64) {
 		id = -1
 	}
 	return slug, id
+}
+
+func execTime(start time.Time, name string) {
+	elapsed := time.Since(start)
+	log.Println(elapsed.String() + ` ` + name)
 }
