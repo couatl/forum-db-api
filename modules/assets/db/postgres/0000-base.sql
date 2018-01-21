@@ -28,10 +28,10 @@ CREATE TABLE IF NOT EXISTS users (
   fullname VARCHAR(64) NOT NULL,
   nickname TEXT UNIQUE NOT NULL
 );
-CREATE UNIQUE INDEX IF NOT EXISTS users_nickname_index
-  ON users (nickname);
+CREATE UNIQUE INDEX IF NOT EXISTS users_low_nickname_index
+  ON users (lower(nickname));
 CREATE UNIQUE INDEX IF NOT EXISTS users_email_index
-  ON users (email);
+  ON users (lower(email));
 
 -- +migrate Up
 CREATE TABLE IF NOT EXISTS forums (
@@ -42,8 +42,8 @@ CREATE TABLE IF NOT EXISTS forums (
   posts   BIGINT  DEFAULT 0,
   threads INTEGER DEFAULT 0
 );
-CREATE INDEX IF NOT EXISTS forums_user_index
-  ON forums (author);
+CREATE UNIQUE INDEX IF NOT EXISTS forums_low_slug_index
+  ON forums (lower(slug));
 CREATE UNIQUE INDEX IF NOT EXISTS forums_slug_index
   ON forums (slug);
 
@@ -60,8 +60,12 @@ CREATE TABLE IF NOT EXISTS threads (
 );
 CREATE INDEX IF NOT EXISTS threads_slug_index
   ON threads (lower(slug));
+CREATE INDEX IF NOT EXISTS threads_id_index
+  ON threads (id);
 CREATE INDEX IF NOT EXISTS threads_forum_index
   ON threads (forum);
+CREATE INDEX IF NOT EXISTS threads_forum_created_index
+  ON threads (forum, created);
 CREATE INDEX IF NOT EXISTS threads_owner_index
   ON threads (author);
 
@@ -77,14 +81,18 @@ CREATE TABLE IF NOT EXISTS posts (
   parent    BIGINT DEFAULT 0,
   path      LTREE
 );
+CREATE INDEX IF NOT EXISTS posts_thread_id_index
+  ON posts (thread, id);
 CREATE INDEX IF NOT EXISTS posts_thread_index
   ON posts (thread);
-CREATE INDEX IF NOT EXISTS posts_parent_index
-  ON posts (parent);
+CREATE INDEX IF NOT EXISTS posts_id_index
+  ON posts (id);
 CREATE INDEX IF NOT EXISTS posts_author_index
   ON posts (author);
+CREATE INDEX IF NOT EXISTS posts_forum_index
+  ON posts (forum);
 CREATE INDEX IF NOT EXISTS posts_path_index
-  ON posts USING GIST (path);
+  ON posts (thread, path);
 
 -- +migrate StatementBegin
 CREATE OR REPLACE FUNCTION update_parent_path() RETURNS TRIGGER AS
@@ -123,4 +131,6 @@ CREATE TABLE IF NOT EXISTS votes (
   voice     INTEGER NOT NULL
 );
 CREATE UNIQUE INDEX votes_user_thread_index
-  ON votes (author, thread);
+  ON votes (lower(author), thread);
+CREATE INDEX votes_thread_index
+  ON votes (thread);
