@@ -160,8 +160,10 @@ func (dbManager ForumPgSQL) ForumGetUsers(params operations.ForumGetUsersParams)
 		return operations.NewForumGetUsersNotFound().WithPayload(&models.Error{Message: ERR_NOT_FOUND})
 	}
 
-	query := `SELECT users.about, users.email, users.fullname, users.nickname FROM users
-	JOIN forum_users ON users.id = forum_users.author_id WHERE forum_users.forum_id = $1`
+	query := `SELECT about, email, fullname, nickname FROM users
+	WHERE users.id IN (SELECT author_id FROM forum_users WHERE forum_id = $1)`
+	// query := `SELECT users.about, users.email, users.fullname, users.nickname FROM users
+	// JOIN forum_users ON (users.id = forum_users.author_id) WHERE forum_users.forum_id = $1`
 
 	desc := params.Desc != nil && *params.Desc
 	if params.Since != nil {
@@ -479,13 +481,13 @@ func (dbManager ForumPgSQL) ThreadGetPosts(params operations.ThreadGetPostsParam
 		return operations.NewThreadGetPostsNotFound().WithPayload(&models.Error{Message: ERR_NOT_FOUND})
 	}
 
-	query := `SELECT id, forum, thread, author, created, is_edited as isEdited, message, parent FROM posts WHERE`
+	query := `SELECT posts.id, forum, thread, author, created, is_edited as isEdited, message, parent FROM posts`
 
 	desc := params.Desc != nil && *params.Desc
 	limit := strconv.FormatInt(int64(*params.Limit), 10)
 
 	if *params.Sort == "flat" {
-		query += ` thread = $1`
+		query += ` WHERE thread = $1`
 		if params.Since != nil {
 			if desc {
 				query += ` AND id < $2`
@@ -521,7 +523,7 @@ func (dbManager ForumPgSQL) ThreadGetPosts(params operations.ThreadGetPostsParam
 		}
 	}
 	if *params.Sort == "tree" {
-		query += ` thread = $1`
+		query += ` WHERE thread = $1`
 		if params.Since != nil {
 			if desc {
 				query += ` AND path < (SELECT path FROM posts WHERE id = $2)`
@@ -557,12 +559,12 @@ func (dbManager ForumPgSQL) ThreadGetPosts(params operations.ThreadGetPostsParam
 		}
 	}
 	if *params.Sort == "parent_tree" {
-		query += ` root_id IN (SELECT id FROM posts WHERE thread = $1 AND parent = 0`
+		query += ` JOIN (SELECT id FROM posts WHERE posts.thread = $1 AND posts.parent = 0`
 		if params.Since != nil {
 			if desc {
-				query += ` AND path < (SELECT path FROM posts WHERE id = $2)`
+				query += ` AND root_id < (SELECT root_id FROM posts WHERE id = $2)`
 			} else {
-				query += ` AND path > (SELECT path FROM posts WHERE id = $2)`
+				query += ` AND root_id > (SELECT root_id FROM posts WHERE id = $2)`
 			}
 		}
 
@@ -572,9 +574,9 @@ func (dbManager ForumPgSQL) ThreadGetPosts(params operations.ThreadGetPostsParam
 		}
 
 		if desc {
-			query += ` ORDER BY id DESC ` + limitStr + `) ORDER BY path DESC`
+			query += ` ORDER BY id DESC ` + limitStr + `) selectedParents ON (root_id = selectedParents.id) ORDER BY path DESC`
 		} else {
-			query += ` ORDER BY id ` + limitStr + `) ORDER BY path`
+			query += ` ORDER BY id ` + limitStr + `) selectedParents ON (root_id = selectedParents.id) ORDER BY path`
 		}
 
 		if params.Since != nil {
