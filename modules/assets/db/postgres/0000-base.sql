@@ -55,7 +55,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS users_email_index
 CREATE TABLE IF NOT EXISTS forums (
   id      BIGSERIAL NOT NULL PRIMARY KEY,
   slug    TEXT UNIQUE NOT NULL,
-  author  TEXT REFERENCES users (nickname),
+  author  TEXT,
   title   VARCHAR(255) NOT NULL,
   posts   BIGINT  DEFAULT 0,
   threads INTEGER DEFAULT 0
@@ -66,8 +66,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS forums_low_slug_index
 -- +migrate Up
 CREATE TABLE IF NOT EXISTS threads (
   id        SERIAL PRIMARY KEY,
-  forum     TEXT REFERENCES forums (slug),
-  author    TEXT REFERENCES users (nickname),
+  forum     TEXT,
+  author    TEXT,
   created   TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
   message   TEXT NOT NULL,
   slug      TEXT,
@@ -90,9 +90,9 @@ CREATE INDEX IF NOT EXISTS threads_author_index
 -- +migrate Up
 CREATE TABLE IF NOT EXISTS posts (
   id        BIGSERIAL PRIMARY KEY,
-  forum     TEXT REFERENCES forums (slug),
-  thread    BIGINT REFERENCES threads (id),
-  author    TEXT REFERENCES users (nickname),
+  forum     TEXT,
+  thread    BIGINT,
+  author    TEXT,
   created   TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
   is_edited BOOLEAN NOT NULL DEFAULT FALSE,
   message   TEXT NOT NULL,
@@ -162,7 +162,7 @@ FOR EACH ROW EXECUTE PROCEDURE update_parent_path();
 CREATE TABLE IF NOT EXISTS votes (
   id        SERIAL NOT NULL PRIMARY KEY,
   author    TEXT REFERENCES users (nickname),
-  thread    BIGINT REFERENCES threads (id),
+  thread    BIGINT,
   voice     INTEGER NOT NULL
 );
 CREATE UNIQUE INDEX votes_user_thread_index
