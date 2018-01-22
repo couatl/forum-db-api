@@ -27,7 +27,6 @@ DROP INDEX IF EXISTS votes_thread_index;
 DROP INDEX IF EXISTS forum_users_slug_nickname_index;
 
 -- +migrate Up
-DROP TRIGGER IF EXISTS threads_tgr ON threads;
 DROP TRIGGER IF EXISTS parent_path_tgr ON posts;
 
 -- +migrate Up
@@ -112,6 +111,10 @@ CREATE INDEX IF NOT EXISTS posts_forum_index
   ON posts (forum);
 CREATE INDEX IF NOT EXISTS posts_path_index
   ON posts (thread, path);
+CREATE INDEX IF NOT EXISTS posts_root_id_index
+  ON posts (root_id);
+CREATE INDEX IF NOT EXISTS posts_thread_parent_index
+  ON posts (thread, parent);
 
 -- +migrate StatementBegin
 CREATE OR REPLACE FUNCTION update_parent_path() RETURNS TRIGGER AS
@@ -125,7 +128,6 @@ $update_parent_path$
         NEW.path = (SELECT posts.path || NEW.id FROM posts WHERE id = NEW.parent);
         NEW.root_id = NEW.path[1];
     END IF;
-    INSERT INTO forum_users (slug, nickname) (SELECT NEW.forum, NEW.author) ON CONFLICT(slug, nickname) DO NOTHING;
     RETURN NEW;
   END;
 $update_parent_path$
@@ -135,21 +137,6 @@ LANGUAGE plpgsql;
 -- +migrate Up
 CREATE TRIGGER parent_path_tgr BEFORE INSERT ON posts
 FOR EACH ROW EXECUTE PROCEDURE update_parent_path();
-
--- +migrate StatementBegin
-CREATE OR REPLACE FUNCTION update_threads() RETURNS TRIGGER AS
-$update_threads$
-  BEGIN
-    INSERT INTO forum_users (slug, nickname) (SELECT NEW.forum, NEW.author) ON CONFLICT(slug, nickname) DO NOTHING;
-    RETURN NEW;
-  END;
-$update_threads$
-LANGUAGE plpgsql;
--- +migrate StatementEnd
-
--- +migrate Up
-CREATE TRIGGER threads_tgr AFTER INSERT ON threads
-FOR EACH ROW EXECUTE PROCEDURE update_threads();
 
 -- +migrate Up
 CREATE TABLE IF NOT EXISTS votes (
@@ -169,5 +156,5 @@ CREATE TABLE IF NOT EXISTS forum_users (
   nickname  TEXT NOT NULL,
   UNIQUE(slug, nickname)
 );
-CREATE INDEX forum_users_slug_nickname_index
+CREATE INDEX forum_users_slug_index
   ON forum_users (slug);
