@@ -24,10 +24,11 @@ DROP INDEX IF EXISTS posts_path_index;
 -- +migrate Up
 DROP INDEX IF EXISTS votes_user_thread_index;
 DROP INDEX IF EXISTS votes_thread_index;
-DROP INDEX IF EXISTS forum_users_slug_nickname_index;
+DROP INDEX IF EXISTS forum_users_nickname_slug_index;
 
 -- +migrate Up
 DROP TRIGGER IF EXISTS parent_path_tgr ON posts;
+DROP TRIGGER IF EXISTS posts_tgr ON posts;
 
 -- +migrate Up
 DROP TABLE IF EXISTS forum_users;
@@ -61,8 +62,6 @@ CREATE TABLE IF NOT EXISTS forums (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS forums_low_slug_index
   ON forums (lower(slug));
-CREATE UNIQUE INDEX IF NOT EXISTS forums_slug_index
-  ON forums (slug);
 
 -- +migrate Up
 CREATE TABLE IF NOT EXISTS threads (
@@ -114,6 +113,8 @@ CREATE INDEX IF NOT EXISTS posts_path_index
 CREATE INDEX IF NOT EXISTS posts_root_id_index
   ON posts (root_id);
 CREATE INDEX IF NOT EXISTS posts_thread_parent_index
+  ON posts (thread, parent, path);
+CREATE INDEX IF NOT EXISTS posts_thread_parent_index
   ON posts (thread, parent);
 
 -- +migrate StatementBegin
@@ -134,9 +135,24 @@ $update_parent_path$
 LANGUAGE plpgsql;
 -- +migrate StatementEnd
 
+-- -- +migrate StatementBegin
+-- CREATE OR REPLACE FUNCTION update_posts() RETURNS TRIGGER AS
+-- $update_posts$
+--   BEGIN
+--     INSERT INTO forum_users (slug, nickname) VALUES(NEW.forum, NEW.author) ON CONFLICT(slug,nickname) DO NOTHING;
+--     RETURN NEW;
+--   END;
+-- $update_posts$
+-- LANGUAGE plpgsql;
+-- -- +migrate StatementEnd
+
 -- +migrate Up
 CREATE TRIGGER parent_path_tgr BEFORE INSERT ON posts
 FOR EACH ROW EXECUTE PROCEDURE update_parent_path();
+
+-- -- +migrate Up
+-- CREATE TRIGGER posts_tgr AFTER INSERT ON posts
+-- FOR EACH ROW EXECUTE PROCEDURE update_posts();
 
 -- +migrate Up
 CREATE TABLE IF NOT EXISTS votes (
@@ -152,9 +168,11 @@ CREATE INDEX votes_thread_index
 
 -- +migrate Up
 CREATE TABLE IF NOT EXISTS forum_users (
+  author    TEXT NOT NULL,
   slug      TEXT NOT NULL,
-  nickname  TEXT NOT NULL,
-  UNIQUE(slug, nickname)
+  UNIQUE(author, slug)
 );
 CREATE INDEX forum_users_slug_index
   ON forum_users (slug);
+CREATE UNIQUE INDEX forum_users_nickname_slug_index
+  ON forum_users (author, slug);
