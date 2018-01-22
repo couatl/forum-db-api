@@ -99,9 +99,6 @@ func (dbManager ForumPgSQL) ForumGetThreads(params operations.ForumGetThreadsPar
 	forum := models.Forum{}
 	threads := models.Threads{}
 
-	start := time.Now()
-	log.Println("GetThreads started")
-
 	err := tx.Get(&forum, `SELECT slug FROM forums WHERE lower(slug) = lower($1)`, params.Slug)
 	if err != nil {
 		log.Println(err)
@@ -133,7 +130,6 @@ func (dbManager ForumPgSQL) ForumGetThreads(params operations.ForumGetThreadsPar
 		tx.Select(&threads, query, forum.Slug)
 	}
 
-	execTime(start, "GetThreads")
 	tx.Commit()
 	return operations.NewForumGetThreadsOK().WithPayload(threads)
 }
@@ -145,9 +141,6 @@ func (dbManager ForumPgSQL) ForumGetUsers(params operations.ForumGetUsersParams)
 	forum := models.Forum{}
 	users := models.Users{}
 
-	start := time.Now()
-	log.Println("GetUsers started")
-
 	err := tx.Get(&forum, `SELECT slug FROM forums WHERE lower(slug) = lower($1)`, params.Slug)
 	if err != nil {
 		log.Println(err)
@@ -157,10 +150,6 @@ func (dbManager ForumPgSQL) ForumGetUsers(params operations.ForumGetUsersParams)
 
 	query := `SELECT about, email, fullname, nickname FROM users
 	WHERE users.nickname IN (SELECT author FROM forum_users WHERE slug = $1)`
-
-	// query := `SELECT DISTINCT ON (lower(users.nickname)) users.about, users.email, users.fullname, users.nickname
-	//  FROM users WHERE users.nickname IN (SELECT author FROM posts WHERE forum = $1)
-	//  OR users.nickname IN (SELECT author FROM threads WHERE forum = $1) `
 
 	// query := `SELECT DISTINCT ON (lower(users.nickname)) users.about, users.email, users.fullname, users.nickname
 	// FROM users LEFT JOIN posts ON (users.nickname = posts.author AND posts.forum = $1)
@@ -198,7 +187,6 @@ func (dbManager ForumPgSQL) ForumGetUsers(params operations.ForumGetUsersParams)
 			return operations.NewForumGetUsersNotFound().WithPayload(&models.Error{Message: ERR})
 		}
 	}
-	execTime(start, `GetUsers`)
 	tx.Commit()
 	return operations.NewForumGetUsersOK().WithPayload(users)
 }
@@ -209,9 +197,6 @@ func (dbManager ForumPgSQL) PostGetOne(params operations.PostGetOneParams) middl
 
 	post := models.Post{}
 	postFull := models.PostFull{}
-
-	start := time.Now()
-	log.Println("PostsGetOne started")
 
 	err := tx.Get(&post, `SELECT id, forum, thread, author, created, is_edited as isEdited,
 		message, parent FROM posts WHERE id = $1`, params.ID)
@@ -263,8 +248,6 @@ func (dbManager ForumPgSQL) PostGetOne(params operations.PostGetOneParams) middl
 			continue
 		}
 	}
-
-	execTime(start, "PostsGetOne")
 
 	tx.Commit()
 	return operations.NewPostGetOneOK().WithPayload(&postFull)
@@ -363,6 +346,12 @@ func (dbManager ForumPgSQL) PostsCreate(params operations.PostsCreateParams) mid
 	}
 
 	tx.MustExec("UPDATE forums SET posts = posts + $1 WHERE slug = $2", len(params.Posts), thread.Forum)
+	// tx.Commit()
+	//
+	// tx = dbManager.db.MustBegin()
+	// for idx := range params.Posts {
+	// 	tx.MustExec(insertForumUsers, users[idx], thread.Forum)
+	// }
 
 	batch, errBatch := tx.Prepare(pq.CopyIn("forum_users", "author", "slug"))
 	if errBatch != nil {
@@ -370,15 +359,8 @@ func (dbManager ForumPgSQL) PostsCreate(params operations.PostsCreateParams) mid
 	}
 	for idx := range params.Posts {
 		batch.Exec(users[idx].Nickname, thread.Forum)
-		// forum := models.Forum{}
-		// errForumUsers := tx.Get(&forum, "SELECT author as user, slug FROM forum_users WHERE author = $1 AND slug = $2", users[idx].Nickname, thread.Forum)
-		// if errForumUsers != nil {
-		// 	log.Println(`Select from forum users : `, errForumUsers)
-		// 	batch.Exec(users[idx].Nickname, thread.Forum)
-		// }
 	}
 
-	// batch.Exec()
 	if _, err := batch.Exec(); err != nil {
 		log.Println(err)
 		tx.Rollback()
@@ -397,9 +379,6 @@ func (dbManager ForumPgSQL) Status(params operations.StatusParams) middleware.Re
 
 	status := models.Status{}
 
-	start := time.Now()
-	log.Println("Status started")
-
 	err := tx.Get(&status, `SELECT (SELECT COUNT(forums.*) FROM forums) as forum,
 	(SELECT COUNT(threads.*) FROM threads) as thread,
 	(SELECT COUNT(posts.*) FROM posts) as post,
@@ -407,8 +386,6 @@ func (dbManager ForumPgSQL) Status(params operations.StatusParams) middleware.Re
 
 	check(err)
 	check(tx.Commit())
-
-	execTime(start, "Status")
 
 	return operations.NewStatusOK().WithPayload(&status)
 }
@@ -478,9 +455,6 @@ func (dbManager ForumPgSQL) ThreadGetOne(params operations.ThreadGetOneParams) m
 func (dbManager ForumPgSQL) ThreadGetPosts(params operations.ThreadGetPostsParams) middleware.Responder {
 	tx := dbManager.db.MustBegin()
 
-	start := time.Now()
-	log.Println("GetPosts started")
-
 	threadID := ID{}
 	posts := models.Posts{}
 
@@ -532,7 +506,6 @@ func (dbManager ForumPgSQL) ThreadGetPosts(params operations.ThreadGetPostsParam
 				return operations.NewThreadGetPostsNotFound().WithPayload(&models.Error{Message: ERR})
 			}
 		}
-		execTime(start, `Flat GetPosts`)
 	}
 	if *params.Sort == "tree" {
 		query += ` thread = $1`
@@ -569,7 +542,6 @@ func (dbManager ForumPgSQL) ThreadGetPosts(params operations.ThreadGetPostsParam
 				return operations.NewThreadGetPostsNotFound().WithPayload(&models.Error{Message: ERR})
 			}
 		}
-		execTime(start, `Tree GetPosts`)
 	}
 	if *params.Sort == "parent_tree" {
 		query += ` root_id IN (SELECT id FROM posts WHERE thread = $1 AND parent = 0`
@@ -607,7 +579,6 @@ func (dbManager ForumPgSQL) ThreadGetPosts(params operations.ThreadGetPostsParam
 				return operations.NewThreadGetPostsNotFound().WithPayload(&models.Error{Message: ERR})
 			}
 		}
-		execTime(start, `ParentTree GetPosts`)
 	}
 
 	tx.Commit()
