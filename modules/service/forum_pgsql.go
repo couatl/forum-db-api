@@ -354,18 +354,17 @@ func (dbManager ForumPgSQL) PostsCreate(params operations.PostsCreateParams) mid
 			return operations.NewPostsCreateConflict().WithPayload(&models.Error{Message: ERR_ALREADY_EXISTS})
 		}
 
-		_, errInsert := tx.Exec("INSERT INTO forum_users (slug, nickname) VALUES($1, $2) ON CONFLICT(slug,nickname) DO NOTHING",
-			thread.Forum, item.Author)
-		if errInsert != nil {
-			log.Println(errInsert)
-			tx.Rollback()
-			return operations.NewPostsCreateConflict().WithPayload(&models.Error{Message: ERR})
-		}
-
 		posts = append(posts, &post)
 	}
 
 	tx.MustExec("UPDATE forums SET posts = posts + $1 WHERE slug = $2", len(params.Posts), thread.Forum)
+	_, errInsert := tx.Exec("INSERT INTO forum_users (slug, nickname) VALUES($1, $2) ON CONFLICT(slug,nickname) DO NOTHING",
+		thread.Forum, user.Nickname)
+	if errInsert != nil {
+		log.Println(errInsert)
+		tx.Rollback()
+		return operations.NewPostsCreateConflict().WithPayload(&models.Error{Message: ERR})
+	}
 
 	tx.Commit()
 	return operations.NewPostsCreateCreated().WithPayload(models.Posts(posts))
