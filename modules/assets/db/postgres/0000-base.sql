@@ -1,6 +1,8 @@
 -- +migrate Up
 DROP INDEX IF EXISTS users_nickname_index;
 DROP INDEX IF EXISTS users_email_index;
+DROP INDEX IF EXISTS users_email_nickname_index;
+DROP INDEX IF EXISTS users_nickname_id_index;
 
 -- +migrate Up
 DROP INDEX IF EXISTS forums_low_slug_index;
@@ -8,27 +10,27 @@ DROP INDEX IF EXISTS forums_slug_index;
 
 -- +migrate Up
 DROP INDEX IF EXISTS threads_slug_index;
-DROP INDEX IF EXISTS threads_id_index;
-DROP INDEX IF EXISTS threads_forum_created_index;
+DROP INDEX IF EXISTS threads_forum_id_index;
 DROP INDEX IF EXISTS threads_forum_index;
+DROP INDEX IF EXISTS threads_created_index;
+DROP INDEX IF EXISTS threads_forum_created_index;
 DROP INDEX IF EXISTS threads_author_index;
 
 -- +migrate Up
 DROP INDEX IF EXISTS posts_thread_index;
-DROP INDEX IF EXISTS posts_id_index;
+DROP INDEX IF EXISTS posts_thread_path_index;
+DROP INDEX IF EXISTS posts_root_id_index;
 DROP INDEX IF EXISTS posts_thread_id_index;
-DROP INDEX IF EXISTS posts_author_index;
-DROP INDEX IF EXISTS posts_forum_index;
-DROP INDEX IF EXISTS posts_path_index;
+DROP INDEX IF EXISTS posts_thread_parent_index;
+DROP INDEX IF EXISTS posts_thread_parent_path_index;
 
 -- +migrate Up
 DROP INDEX IF EXISTS votes_user_thread_index;
 DROP INDEX IF EXISTS votes_thread_index;
-DROP INDEX IF EXISTS forum_users_nickname_slug_index;
+DROP INDEX IF EXISTS forum_users_slug_index;
 
 -- +migrate Up
 DROP TRIGGER IF EXISTS parent_path_tgr ON posts;
-DROP TRIGGER IF EXISTS posts_tgr ON posts;
 
 -- +migrate Up
 DROP TABLE IF EXISTS forum_users;
@@ -51,7 +53,9 @@ CREATE UNIQUE INDEX IF NOT EXISTS users_nickname_index
 CREATE UNIQUE INDEX IF NOT EXISTS users_email_index
   ON users (lower(email));
 CREATE INDEX IF NOT EXISTS users_email_nickname_index
-  ON users (id, lower(nickname));
+  ON users (lower(email), lower(nickname));
+CREATE INDEX IF NOT EXISTS users_nickname_id_index
+  ON users (id, lower(nickname) DESC);
 
 -- +migrate Up
 CREATE TABLE IF NOT EXISTS forums (
@@ -85,7 +89,7 @@ CREATE INDEX IF NOT EXISTS threads_forum_id_index
 CREATE INDEX IF NOT EXISTS threads_forum_index
   ON threads (forum);
 CREATE INDEX IF NOT EXISTS threads_forum_created_index
-  ON threads (forum, created);
+  ON threads (forum, created DESC);
 CREATE INDEX IF NOT EXISTS threads_created_index
   ON threads (created);
 CREATE INDEX IF NOT EXISTS threads_author_index
@@ -104,23 +108,17 @@ CREATE TABLE IF NOT EXISTS posts (
   path      BIGINT [],
   root_id   BIGINT
 );
-CREATE INDEX IF NOT EXISTS posts_thread_id_index
-  ON posts (thread, id);
 CREATE INDEX IF NOT EXISTS posts_thread_index
   ON posts (thread);
-CREATE INDEX IF NOT EXISTS posts_author_index
-  ON posts (author);
-CREATE INDEX IF NOT EXISTS posts_forum_index
-  ON posts (forum);
-CREATE INDEX IF NOT EXISTS posts_path_index
-  ON posts (path);
 CREATE INDEX IF NOT EXISTS posts_thread_path_index
-  ON posts (thread, path);
+  ON posts (thread, path DESC);
 CREATE INDEX IF NOT EXISTS posts_root_id_index
   ON posts (root_id);
+CREATE INDEX IF NOT EXISTS posts_thread_id_index
+  ON posts (thread, id DESC);
 CREATE INDEX IF NOT EXISTS posts_thread_parent_index
-  ON posts (thread, parent, path);
-CREATE INDEX IF NOT EXISTS posts_thread_parent_index
+  ON posts (thread, parent, path DESC);
+CREATE INDEX IF NOT EXISTS posts_thread_parent_path_index
   ON posts (thread, parent);
 
 -- +migrate StatementBegin
@@ -141,24 +139,9 @@ $update_parent_path$
 LANGUAGE plpgsql;
 -- +migrate StatementEnd
 
--- -- +migrate StatementBegin
--- CREATE OR REPLACE FUNCTION update_posts() RETURNS TRIGGER AS
--- $update_posts$
---   BEGIN
---     INSERT INTO forum_users (slug, nickname) VALUES(NEW.forum, NEW.author) ON CONFLICT(slug,nickname) DO NOTHING;
---     RETURN NEW;
---   END;
--- $update_posts$
--- LANGUAGE plpgsql;
--- -- +migrate StatementEnd
-
 -- +migrate Up
-CREATE TRIGGER parent_path_tgr BEFORE INSERT ON posts
+CREATE TRIGGER IF NOT EXISTS parent_path_tgr BEFORE INSERT ON posts
 FOR EACH ROW EXECUTE PROCEDURE update_parent_path();
-
--- -- +migrate Up
--- CREATE TRIGGER posts_tgr AFTER INSERT ON posts
--- FOR EACH ROW EXECUTE PROCEDURE update_posts();
 
 -- +migrate Up
 CREATE TABLE IF NOT EXISTS votes (
