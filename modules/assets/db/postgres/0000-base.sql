@@ -3,6 +3,7 @@ DROP INDEX IF EXISTS users_nickname_index;
 DROP INDEX IF EXISTS users_email_index;
 DROP INDEX IF EXISTS users_email_nickname_index;
 DROP INDEX IF EXISTS users_nickname_id_index;
+DROP INDEX IF EXISTS users_nickname_id_asc_index;
 
 -- +migrate Up
 DROP INDEX IF EXISTS forums_low_slug_index;
@@ -56,6 +57,8 @@ CREATE INDEX IF NOT EXISTS users_email_nickname_index
   ON users (lower(email), lower(nickname));
 CREATE INDEX IF NOT EXISTS users_nickname_id_index
   ON users (id, lower(nickname) DESC);
+CREATE INDEX IF NOT EXISTS users_nickname_id_asc_index
+  ON users (id, lower(nickname));
 
 -- +migrate Up
 CREATE TABLE IF NOT EXISTS forums (
@@ -112,12 +115,16 @@ CREATE INDEX IF NOT EXISTS posts_thread_index
   ON posts (thread);
 CREATE INDEX IF NOT EXISTS posts_thread_path_index
   ON posts (thread, path DESC);
+  CREATE INDEX IF NOT EXISTS posts_thread_path_asc_index
+    ON posts (thread, path);
 CREATE INDEX IF NOT EXISTS posts_root_id_index
   ON posts (root_id);
 CREATE INDEX IF NOT EXISTS posts_thread_id_index
   ON posts (thread, id DESC);
 CREATE INDEX IF NOT EXISTS posts_thread_parent_index
   ON posts (thread, parent, path DESC);
+  CREATE INDEX IF NOT EXISTS posts_thread_parent_asc_index
+    ON posts (thread, parent, path);
 CREATE INDEX IF NOT EXISTS posts_thread_parent_path_index
   ON posts (thread, parent);
 
