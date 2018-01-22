@@ -140,7 +140,7 @@ LANGUAGE plpgsql;
 -- +migrate StatementEnd
 
 -- +migrate Up
-CREATE TRIGGER IF NOT EXISTS parent_path_tgr BEFORE INSERT ON posts
+CREATE TRIGGER parent_path_tgr BEFORE INSERT ON posts
 FOR EACH ROW EXECUTE PROCEDURE update_parent_path();
 
 -- +migrate Up
