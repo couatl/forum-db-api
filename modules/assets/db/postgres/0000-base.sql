@@ -50,6 +50,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS users_nickname_index
   ON users (lower(nickname));
 CREATE UNIQUE INDEX IF NOT EXISTS users_email_index
   ON users (lower(email));
+CREATE INDEX IF NOT EXISTS users_email_nickname_index
+  ON users (id, lower(nickname));
 
 -- +migrate Up
 CREATE TABLE IF NOT EXISTS forums (
@@ -67,6 +69,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS forums_low_slug_index
 CREATE TABLE IF NOT EXISTS threads (
   id        SERIAL PRIMARY KEY,
   forum     TEXT,
+  forum_id  BIGINT,
+  author_id BIGINT,
   author    TEXT,
   created   TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
   message   TEXT NOT NULL,
@@ -76,8 +80,8 @@ CREATE TABLE IF NOT EXISTS threads (
 );
 CREATE INDEX IF NOT EXISTS threads_slug_index
   ON threads (lower(slug));
-CREATE INDEX IF NOT EXISTS threads_id_index
-  ON threads (id);
+CREATE INDEX IF NOT EXISTS threads_forum_id_index
+  ON threads (forum_id);
 CREATE INDEX IF NOT EXISTS threads_forum_index
   ON threads (forum);
 CREATE INDEX IF NOT EXISTS threads_forum_created_index
@@ -104,8 +108,6 @@ CREATE INDEX IF NOT EXISTS posts_thread_id_index
   ON posts (thread, id);
 CREATE INDEX IF NOT EXISTS posts_thread_index
   ON posts (thread);
-CREATE INDEX IF NOT EXISTS posts_id_index
-  ON posts (id);
 CREATE INDEX IF NOT EXISTS posts_author_index
   ON posts (author);
 CREATE INDEX IF NOT EXISTS posts_forum_index
