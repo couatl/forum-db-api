@@ -166,11 +166,11 @@ CREATE UNIQUE INDEX votes_user_thread_index
 CREATE INDEX votes_thread_index
   ON votes (thread);
 
--- +migrate Up
-CREATE TABLE IF NOT EXISTS forum_users (
-  author    TEXT NOT NULL,
-  slug      TEXT NOT NULL,
-  UNIQUE(author, slug)
-);
-CREATE INDEX forum_users_slug_index
-  ON forum_users (slug);
+-- -- +migrate Up
+-- CREATE TABLE IF NOT EXISTS forum_users (
+--   author    TEXT NOT NULL,
+--   slug      TEXT NOT NULL,
+--   UNIQUE(author, slug)
+-- );
+-- CREATE INDEX forum_users_slug_index
+--   ON forum_users (slug);
