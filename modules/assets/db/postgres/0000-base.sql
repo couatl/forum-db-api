@@ -174,5 +174,3 @@ CREATE TABLE IF NOT EXISTS forum_users (
 );
 CREATE INDEX forum_users_slug_index
   ON forum_users (slug);
-CREATE UNIQUE INDEX forum_users_nickname_slug_index
-  ON forum_users (author, slug);

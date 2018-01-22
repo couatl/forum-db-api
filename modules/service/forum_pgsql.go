@@ -357,8 +357,8 @@ func (dbManager ForumPgSQL) PostsCreate(params operations.PostsCreateParams) mid
 		posts = append(posts, &post)
 
 		forum := models.Forum{}
-		tx.Get(&forum, "SELECT author as user, slug FROM forum_users WHERE author = $1 AND slug = $2", user.Nickname, thread.Forum)
-		if err != nil {
+		errForumUsers := tx.Get(&forum, "SELECT author as user, slug FROM forum_users WHERE author = $1 AND slug = $2", user.Nickname, thread.Forum)
+		if errForumUsers != nil {
 			tx.MustExec("INSERT INTO forum_users (author, slug) VALUES($1, $2) ON CONFLICT(author, slug) DO NOTHING;",
 				user.Nickname, thread.Forum)
 		}
