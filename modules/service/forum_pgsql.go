@@ -61,7 +61,7 @@ func (dbManager ForumPgSQL) ForumCreate(params operations.ForumCreateParams) mid
 	err := tx.Get(&user, `SELECT nickname FROM users WHERE lower(nickname) = lower($1)`, params.Forum.User)
 
 	if err != nil {
-		log.Println(err)
+		//log.Println(err)
 		tx.Rollback()
 		return operations.NewForumCreateNotFound().WithPayload(&models.Error{Message: ERR_NOT_FOUND})
 	}
@@ -70,7 +70,7 @@ func (dbManager ForumPgSQL) ForumCreate(params operations.ForumCreateParams) mid
 		FROM forums WHERE lower(slug) = lower($1)`, params.Forum.Slug)
 
 	if errAlreadyExists == nil {
-		log.Println(errAlreadyExists)
+		//log.Println(errAlreadyExists)
 		tx.Rollback()
 		return operations.NewForumCreateConflict().WithPayload(&forum)
 	}
@@ -93,7 +93,7 @@ func (dbManager ForumPgSQL) ForumGetOne(params operations.ForumGetOneParams) mid
 		WHERE lower(slug) = lower($1)`, params.Slug)
 
 	if err != nil {
-		log.Println(err)
+		//log.Println(err)
 		tx.Rollback()
 		return operations.NewForumGetOneNotFound().WithPayload(&models.Error{Message: ERR_NOT_FOUND})
 	}
@@ -111,7 +111,7 @@ func (dbManager ForumPgSQL) ForumGetThreads(params operations.ForumGetThreadsPar
 
 	err := tx.Get(&forum, `SELECT slug, id FROM forums WHERE lower(slug) = lower($1)`, params.Slug)
 	if err != nil {
-		log.Println(err)
+		//log.Println(err)
 		tx.Rollback()
 		return operations.NewForumGetThreadsNotFound().WithPayload(&models.Error{Message: ERR_NOT_FOUND})
 	}
@@ -213,7 +213,7 @@ func (dbManager ForumPgSQL) PostGetOne(params operations.PostGetOneParams) middl
 		message, parent FROM posts WHERE id = $1`, params.ID)
 
 	if err != nil {
-		log.Println(err)
+		//log.Println(err)
 		tx.Rollback()
 		return operations.NewPostGetOneNotFound().WithPayload(&models.Error{Message: ERR_NOT_FOUND})
 	}
@@ -272,7 +272,7 @@ func (dbManager ForumPgSQL) PostUpdate(params operations.PostUpdateParams) middl
 
 	err := tx.Get(&post, "SELECT id, forum, thread, created, author, is_edited as isEdited, message, parent FROM posts WHERE id = $1", params.ID)
 	if err != nil {
-		log.Println(err)
+		//log.Println(err)
 		tx.Rollback()
 		return operations.NewPostUpdateNotFound().WithPayload(&models.Error{Message: ERR_NOT_FOUND})
 	}
@@ -282,7 +282,7 @@ func (dbManager ForumPgSQL) PostUpdate(params operations.PostUpdateParams) middl
 			WHERE id = $2
 			RETURNING id, forum, thread, created, author, is_edited as isEdited, message, parent `, params.Post.Message, params.ID)
 		if err != nil {
-			log.Println(err)
+			//log.Println(err)
 			tx.Rollback()
 			return operations.NewPostUpdateNotFound().WithPayload(&models.Error{Message: ERR_NOT_FOUND})
 		}
@@ -325,7 +325,8 @@ func (dbManager ForumPgSQL) PostsCreate(params operations.PostsCreateParams) mid
 	($1, $2, $3, $4, $5) RETURNING author, created, forum, id, is_edited as isEdited, message, thread, parent;`
 	//insertForumUsers := "INSERT INTO forum_users (author, slug) VALUES($1, $2) ON CONFLICT(author, slug) DO NOTHING;"
 
-	// batch, errBatch := tx.Prepare(pq.CopyIn("posts", "forum", "thread", "author", "message", "parent"))
+	tx.Get(&forumID, "UPDATE forums SET posts = posts + $1 WHERE slug = $2 RETURNING id", len(params.Posts), thread.Forum)
+
 	for _, item := range params.Posts {
 		post := models.Post{}
 
@@ -336,7 +337,11 @@ func (dbManager ForumPgSQL) PostsCreate(params operations.PostsCreateParams) mid
 			return operations.NewPostsCreateNotFound().WithPayload(&models.Error{Message: ERR_NOT_FOUND})
 		}
 
-		users = append(users, user)
+		errForumUsers := tx.Get(&postID, `SELECT author_id as id FROM forum_users WHERE author_id = $1 AND forum_id = $2`, user.ID, forumID.ID)
+		if errForumUsers != nil {
+			log.Println(errForumUsers)
+			users = append(users, user)
+		}
 
 		if item.Parent != 0 {
 			errNotFound := tx.Get(&postID, checkParent, thread.ID, item.Parent)
@@ -357,7 +362,6 @@ func (dbManager ForumPgSQL) PostsCreate(params operations.PostsCreateParams) mid
 		posts = append(posts, &post)
 	}
 
-	tx.Get(&forumID, "UPDATE forums SET posts = posts + $1 WHERE slug = $2 RETURNING id", len(params.Posts), thread.Forum)
 	// tx.Commit()
 	//
 	// tx = dbManager.db.MustBegin()
@@ -369,8 +373,8 @@ func (dbManager ForumPgSQL) PostsCreate(params operations.PostsCreateParams) mid
 	if errBatch != nil {
 		log.Fatal(errBatch)
 	}
-	for idx := range params.Posts {
-		batch.Exec(users[idx].ID, forumID.ID)
+	for _, item := range users {
+		batch.Exec(item.ID, forumID.ID)
 	}
 
 	if _, err := batch.Exec(); err != nil {
@@ -409,12 +413,13 @@ func (dbManager ForumPgSQL) ThreadCreate(params operations.ThreadCreateParams) m
 	thread := models.Thread{}
 	forum := forumID{}
 	user := userID{}
+	forumUsers := ID{}
 
 	errNotFound := tx.Get(&forum, `SELECT slug, id FROM forums WHERE lower(slug) = lower($1)`, params.Slug)
 	errNotFound2 := tx.Get(&user, `SELECT nickname, id FROM users WHERE lower(nickname) = lower($1)`, params.Thread.Author)
 	if errNotFound != nil || errNotFound2 != nil {
-		log.Println(errNotFound)
-		log.Println(errNotFound2)
+		//log.Println(errNotFound)
+		//log.Println(errNotFound2)
 		tx.Rollback()
 		return operations.NewThreadCreateNotFound().WithPayload(&models.Error{Message: ERR_NOT_FOUND})
 	}
@@ -422,7 +427,7 @@ func (dbManager ForumPgSQL) ThreadCreate(params operations.ThreadCreateParams) m
 	if params.Thread.Slug != "" {
 		errAlreadyExists := tx.Get(&thread, `SELECT forum, author, created, message, title, slug, id, votes FROM threads WHERE lower(slug) = lower($1)`, params.Thread.Slug)
 		if errAlreadyExists == nil {
-			log.Println(errAlreadyExists)
+			//log.Println(errAlreadyExists)
 			tx.Rollback()
 			return operations.NewThreadCreateConflict().WithPayload(&thread)
 		}
@@ -432,13 +437,17 @@ func (dbManager ForumPgSQL) ThreadCreate(params operations.ThreadCreateParams) m
 	VALUES ($1, $2, COALESCE($3, now()), $4, $5, $6, $7, $8) RETURNING forum, author, created, message, title, slug, id, votes`,
 		forum.Slug, user.Nickname, params.Thread.Created, params.Thread.Message, params.Thread.Title, params.Thread.Slug, forum.ID, user.ID)
 	if err != nil {
-		log.Println(err)
+		//log.Println(err)
 		tx.Rollback()
 		return operations.NewThreadCreateNotFound().WithPayload(&models.Error{Message: ERR})
 	}
 
 	tx.MustExec("UPDATE forums SET threads = threads + 1 WHERE id = $1", forum.ID)
-	tx.MustExec("INSERT INTO forum_users (author_id, forum_id) VALUES ($1, $2)", user.ID, forum.ID)
+	errForumUsers := tx.Get(&forumUsers, `SELECT author_id as id FROM forum_users WHERE author_id = $1 AND forum_id = $2`, user.ID, forum.ID)
+	if errForumUsers != nil {
+		tx.MustExec("INSERT INTO forum_users (author_id, forum_id) VALUES ($1, $2)", user.ID, forum.ID)
+		log.Println(errForumUsers)
+	}
 	// ON CONFLICT(slug, author) DO NOTHING
 
 	tx.Commit()
@@ -455,7 +464,7 @@ func (dbManager ForumPgSQL) ThreadGetOne(params operations.ThreadGetOneParams) m
 	err := tx.Get(&thread, `SELECT forum, author, created, message, title, slug, id, votes
 		 FROM threads WHERE lower(slug) = lower($1) OR id = $2`, slug, id)
 	if err != nil {
-		log.Println(err)
+		//log.Println(err)
 		tx.Rollback()
 		return operations.NewThreadGetOneNotFound().WithPayload(&models.Error{Message: ERR_NOT_FOUND})
 	}
@@ -476,7 +485,7 @@ func (dbManager ForumPgSQL) ThreadGetPosts(params operations.ThreadGetPostsParam
 	slug, id := SlugID(params.SlugOrID)
 	errNotFound := tx.Get(&threadID, `SELECT id FROM threads WHERE lower(slug) = lower($1) OR id = $2`, slug, id)
 	if errNotFound != nil {
-		log.Println(errNotFound)
+		//log.Println(errNotFound)
 		tx.Rollback()
 		return operations.NewThreadGetPostsNotFound().WithPayload(&models.Error{Message: ERR_NOT_FOUND})
 	}
@@ -611,7 +620,7 @@ func (dbManager ForumPgSQL) ThreadUpdate(params operations.ThreadUpdateParams) m
 	slug, id := SlugID(params.SlugOrID)
 	err := tx.Get(&threadID, `SELECT id FROM threads WHERE lower(slug) = lower($1) OR id = $2`, slug, id)
 	if err != nil {
-		log.Println(err)
+		//log.Println(err)
 		tx.Rollback()
 		return operations.NewThreadUpdateNotFound().WithPayload(&models.Error{Message: ERR_NOT_FOUND})
 	}
@@ -627,7 +636,7 @@ func (dbManager ForumPgSQL) ThreadUpdate(params operations.ThreadUpdateParams) m
 
 	errNotFound := tx.Get(&thread, query, threadID.ID)
 	if errNotFound != nil {
-		log.Println(errNotFound)
+		//log.Println(errNotFound)
 		tx.Rollback()
 		return operations.NewUserUpdateConflict().WithPayload(&models.Error{Message: ERR_NOT_FOUND})
 	}
@@ -647,14 +656,14 @@ func (dbManager ForumPgSQL) ThreadVote(params operations.ThreadVoteParams) middl
 	slug, id := SlugID(params.SlugOrID)
 	err := tx.Get(&threadID, `SELECT id FROM threads WHERE lower(slug) = lower($1) OR id = $2`, slug, id)
 	if err != nil {
-		log.Println(err)
+		//log.Println(err)
 		tx.Rollback()
 		return operations.NewThreadVoteNotFound().WithPayload(&models.Error{Message: ERR_NOT_FOUND})
 	}
 
 	errExist := tx.Get(&voteID, `SELECT id FROM votes WHERE lower(author) = lower($1) AND thread = $2`, params.Vote.Nickname, threadID.ID)
 	if errExist != nil {
-		log.Println(errExist)
+		//log.Println(errExist)
 
 		_, errAlreadyExists := tx.Exec(`INSERT INTO votes (voice, author, thread) VALUES ($1, $2, $3)`,
 			params.Vote.Voice, params.Vote.Nickname, threadID.ID)
@@ -662,7 +671,7 @@ func (dbManager ForumPgSQL) ThreadVote(params operations.ThreadVoteParams) middl
 		tx.Get(&thread, `UPDATE threads SET votes = votes + $1 WHERE id = $2 RETURNING forum, author, created, message, title, slug, id, votes`, params.Vote.Voice, threadID.ID)
 
 		if errAlreadyExists != nil {
-			log.Println(errAlreadyExists)
+			//log.Println(errAlreadyExists)
 			tx.Rollback()
 			return operations.NewThreadVoteNotFound().WithPayload(&models.Error{Message: ERR_NOT_FOUND})
 		}
@@ -674,7 +683,7 @@ func (dbManager ForumPgSQL) ThreadVote(params operations.ThreadVoteParams) middl
 									WHERE id = $1 RETURNING forum, author, created, message, title, slug, id, votes`, threadID.ID)
 
 		if errNotFound != nil {
-			log.Println(errNotFound)
+			//log.Println(errNotFound)
 			tx.Rollback()
 			return operations.NewThreadVoteNotFound().WithPayload(&models.Error{Message: ERR_NOT_FOUND})
 		}
