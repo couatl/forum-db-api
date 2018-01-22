@@ -121,10 +121,12 @@ CREATE INDEX IF NOT EXISTS posts_root_id_index
   ON posts (root_id);
 CREATE INDEX IF NOT EXISTS posts_thread_id_index
   ON posts (thread, id DESC);
+CREATE INDEX IF NOT EXISTS posts_thread_id_asc_index
+  ON posts (thread, id);
 CREATE INDEX IF NOT EXISTS posts_thread_parent_index
   ON posts (thread, parent, path DESC);
-  CREATE INDEX IF NOT EXISTS posts_thread_parent_asc_index
-    ON posts (thread, parent, path);
+CREATE INDEX IF NOT EXISTS posts_thread_parent_asc_index
+  ON posts (thread, parent, path);
 CREATE INDEX IF NOT EXISTS posts_thread_parent_path_index
   ON posts (thread, parent);
 
