@@ -82,6 +82,8 @@ CREATE INDEX IF NOT EXISTS threads_forum_index
   ON threads (forum);
 CREATE INDEX IF NOT EXISTS threads_forum_created_index
   ON threads (forum, created);
+CREATE INDEX IF NOT EXISTS threads_created_index
+  ON threads (created);
 CREATE INDEX IF NOT EXISTS threads_author_index
   ON threads (author);
 
@@ -109,6 +111,8 @@ CREATE INDEX IF NOT EXISTS posts_author_index
 CREATE INDEX IF NOT EXISTS posts_forum_index
   ON posts (forum);
 CREATE INDEX IF NOT EXISTS posts_path_index
+  ON posts (path);
+CREATE INDEX IF NOT EXISTS posts_thread_path_index
   ON posts (thread, path);
 CREATE INDEX IF NOT EXISTS posts_root_id_index
   ON posts (root_id);
@@ -168,8 +172,8 @@ CREATE INDEX votes_thread_index
 
 -- +migrate Up
 CREATE TABLE IF NOT EXISTS forum_users (
-  author    TEXT NOT NULL,
-  slug      TEXT NOT NULL
+  author_id  BIGINT,
+  forum_id   BIGINT
 );
 CREATE INDEX forum_users_slug_index
-  ON forum_users (slug);
+  ON forum_users (forum_id);

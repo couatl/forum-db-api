@@ -22,6 +22,16 @@ type ID struct {
 	ID int64 `db:"id"`
 }
 
+type userID struct {
+	ID       int64  `db:"id"`
+	Nickname string `db:"nickname"`
+}
+
+type forumID struct {
+	ID   int64  `db:"id"`
+	Slug string `db:"slug"`
+}
+
 type ForumPgSQL struct {
 	ForumGeneric
 }
@@ -138,10 +148,10 @@ func (dbManager ForumPgSQL) ForumGetThreads(params operations.ForumGetThreadsPar
 func (dbManager ForumPgSQL) ForumGetUsers(params operations.ForumGetUsersParams) middleware.Responder {
 	tx := dbManager.db.MustBegin()
 
-	forum := models.Forum{}
+	forum := forumID{}
 	users := models.Users{}
 
-	err := tx.Get(&forum, `SELECT slug FROM forums WHERE lower(slug) = lower($1)`, params.Slug)
+	err := tx.Get(&forum, `SELECT slug, id FROM forums WHERE lower(slug) = lower($1)`, params.Slug)
 	if err != nil {
 		log.Println(err)
 		tx.Rollback()
@@ -149,7 +159,7 @@ func (dbManager ForumPgSQL) ForumGetUsers(params operations.ForumGetUsersParams)
 	}
 
 	query := `SELECT about, email, fullname, nickname FROM users
-	WHERE users.nickname IN (SELECT author FROM forum_users WHERE slug = $1)`
+	WHERE users.id IN (SELECT author_id FROM forum_users WHERE forum_id = $1)`
 
 	// query := `SELECT DISTINCT ON (lower(users.nickname)) users.about, users.email, users.fullname, users.nickname
 	// FROM users LEFT JOIN posts ON (users.nickname = posts.author AND posts.forum = $1)
@@ -173,14 +183,14 @@ func (dbManager ForumPgSQL) ForumGetUsers(params operations.ForumGetUsersParams)
 	}
 
 	if params.Since != nil {
-		errUnexpected := tx.Select(&users, query, forum.Slug, *params.Since)
+		errUnexpected := tx.Select(&users, query, forum.ID, *params.Since)
 		if errUnexpected != nil {
 			log.Println(errUnexpected)
 			tx.Rollback()
 			return operations.NewForumGetUsersNotFound().WithPayload(&models.Error{Message: ERR})
 		}
 	} else {
-		errUnexpected := tx.Select(&users, query, forum.Slug)
+		errUnexpected := tx.Select(&users, query, forum.ID)
 		if errUnexpected != nil {
 			log.Println(errUnexpected)
 			tx.Rollback()
@@ -287,9 +297,10 @@ func (dbManager ForumPgSQL) PostsCreate(params operations.PostsCreateParams) mid
 
 	thread := models.Thread{}
 	posts := []*models.Post{}
-	users := []models.User{}
-	user := models.User{}
+	users := []userID{}
+	user := userID{}
 
+	forumID := ID{}
 	postID := ID{}
 
 	slug, id := SlugID(params.SlugOrID)
@@ -307,7 +318,7 @@ func (dbManager ForumPgSQL) PostsCreate(params operations.PostsCreateParams) mid
 	}
 
 	checkParent := "SELECT id FROM posts WHERE thread = $1 AND id = $2"
-	checkUser := "SELECT nickname FROM users WHERE lower(nickname) = lower($1)"
+	checkUser := "SELECT nickname, id FROM users WHERE lower(nickname) = lower($1)"
 
 	insertPosts := `INSERT INTO posts (forum, thread, author, message, parent) VALUES
 	($1, $2, $3, $4, $5) RETURNING author, created, forum, id, is_edited as isEdited, message, thread, parent;`
@@ -335,7 +346,7 @@ func (dbManager ForumPgSQL) PostsCreate(params operations.PostsCreateParams) mid
 			}
 		}
 
-		errAlreadyExists := tx.Get(&post, insertPosts, thread.Forum, thread.ID, item.Author, item.Message, item.Parent)
+		errAlreadyExists := tx.Get(&post, insertPosts, thread.Forum, thread.ID, user.Nickname, item.Message, item.Parent)
 		if errAlreadyExists != nil {
 			log.Println(errAlreadyExists)
 			tx.Rollback()
@@ -345,7 +356,7 @@ func (dbManager ForumPgSQL) PostsCreate(params operations.PostsCreateParams) mid
 		posts = append(posts, &post)
 	}
 
-	tx.MustExec("UPDATE forums SET posts = posts + $1 WHERE slug = $2", len(params.Posts), thread.Forum)
+	tx.Get(&forumID, "UPDATE forums SET posts = posts + $1 WHERE slug = $2 RETURNING id", len(params.Posts), thread.Forum)
 	// tx.Commit()
 	//
 	// tx = dbManager.db.MustBegin()
@@ -353,12 +364,12 @@ func (dbManager ForumPgSQL) PostsCreate(params operations.PostsCreateParams) mid
 	// 	tx.MustExec(insertForumUsers, users[idx], thread.Forum)
 	// }
 
-	batch, errBatch := tx.Prepare(pq.CopyIn("forum_users", "author", "slug"))
+	batch, errBatch := tx.Prepare(pq.CopyIn("forum_users", "author_id", "forum_id"))
 	if errBatch != nil {
 		log.Fatal(errBatch)
 	}
 	for idx := range params.Posts {
-		batch.Exec(users[idx].Nickname, thread.Forum)
+		batch.Exec(users[idx].ID, forumID.ID)
 	}
 
 	if _, err := batch.Exec(); err != nil {
@@ -395,11 +406,11 @@ func (dbManager ForumPgSQL) ThreadCreate(params operations.ThreadCreateParams) m
 	tx := dbManager.db.MustBegin()
 
 	thread := models.Thread{}
-	forum := models.Forum{}
-	user := models.User{}
+	forum := forumID{}
+	user := userID{}
 
-	errNotFound := tx.Get(&forum, `SELECT slug FROM forums WHERE lower(slug) = lower($1)`, params.Slug)
-	errNotFound2 := tx.Get(&user, `SELECT nickname FROM users WHERE lower(nickname) = lower($1)`, params.Thread.Author)
+	errNotFound := tx.Get(&forum, `SELECT slug, id FROM forums WHERE lower(slug) = lower($1)`, params.Slug)
+	errNotFound2 := tx.Get(&user, `SELECT nickname, id FROM users WHERE lower(nickname) = lower($1)`, params.Thread.Author)
 	if errNotFound != nil || errNotFound2 != nil {
 		log.Println(errNotFound)
 		log.Println(errNotFound2)
@@ -426,7 +437,7 @@ func (dbManager ForumPgSQL) ThreadCreate(params operations.ThreadCreateParams) m
 	}
 
 	tx.MustExec("UPDATE forums SET threads = threads + 1 WHERE slug = $1", forum.Slug)
-	tx.MustExec("INSERT INTO forum_users (slug, author) VALUES ($1, $2)", forum.Slug, user.Nickname)
+	tx.MustExec("INSERT INTO forum_users (author_id, forum_id) VALUES ($1, $2)", user.ID, forum.ID)
 	// ON CONFLICT(slug, author) DO NOTHING
 
 	tx.Commit()
