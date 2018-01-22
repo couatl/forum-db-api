@@ -160,13 +160,8 @@ func (dbManager ForumPgSQL) ForumGetUsers(params operations.ForumGetUsersParams)
 		return operations.NewForumGetUsersNotFound().WithPayload(&models.Error{Message: ERR_NOT_FOUND})
 	}
 
-	query := `SELECT about, email, fullname, nickname FROM users
-	WHERE users.id IN (SELECT author_id FROM forum_users WHERE forum_id = $1)`
-
-	// query := `SELECT DISTINCT ON (lower(users.nickname)) users.about, users.email, users.fullname, users.nickname
-	// FROM users LEFT JOIN posts ON (users.nickname = posts.author AND posts.forum = $1)
-	// LEFT JOIN threads ON (users.nickname = threads.author AND threads.forum = $1)
-	// WHERE (posts.author IS NOT NULL OR threads.author IS NOT NULL) `
+	query := `SELECT users.about, users.email, users.fullname, users.nickname FROM users
+	JOIN forum_users ON users.id = forum_users.author_id WHERE forum_users.forum_id = $1`
 
 	desc := params.Desc != nil && *params.Desc
 	if params.Since != nil {

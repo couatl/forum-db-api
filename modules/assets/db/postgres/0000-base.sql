@@ -1,4 +1,5 @@
 -- +migrate Up
+SET SYNCHRONOUS_COMMIT = 'off';
 DROP INDEX IF EXISTS users_nickname_index;
 DROP INDEX IF EXISTS users_email_index;
 DROP INDEX IF EXISTS users_email_nickname_index;
@@ -51,12 +52,8 @@ CREATE TABLE IF NOT EXISTS users (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS users_nickname_index
   ON users (lower(nickname));
-CREATE UNIQUE INDEX IF NOT EXISTS users_email_index
-  ON users (lower(email));
 CREATE INDEX IF NOT EXISTS users_email_nickname_index
   ON users (lower(email), lower(nickname));
-CREATE INDEX IF NOT EXISTS users_nickname_id_index
-  ON users (id, lower(nickname) DESC);
 CREATE INDEX IF NOT EXISTS users_nickname_id_asc_index
   ON users (id, lower(nickname));
 
@@ -113,18 +110,12 @@ CREATE TABLE IF NOT EXISTS posts (
 );
 CREATE INDEX IF NOT EXISTS posts_thread_index
   ON posts (thread);
-CREATE INDEX IF NOT EXISTS posts_thread_path_index
-  ON posts (thread, path DESC);
-  CREATE INDEX IF NOT EXISTS posts_thread_path_asc_index
-    ON posts (thread, path);
+CREATE INDEX IF NOT EXISTS posts_thread_path_asc_index
+  ON posts (thread, path);
 CREATE INDEX IF NOT EXISTS posts_root_id_index
   ON posts (root_id);
-CREATE INDEX IF NOT EXISTS posts_thread_id_index
-  ON posts (thread, id DESC);
 CREATE INDEX IF NOT EXISTS posts_thread_id_asc_index
   ON posts (thread, id);
-CREATE INDEX IF NOT EXISTS posts_thread_parent_index
-  ON posts (thread, parent, path DESC);
 CREATE INDEX IF NOT EXISTS posts_thread_parent_asc_index
   ON posts (thread, parent, path);
 CREATE INDEX IF NOT EXISTS posts_thread_parent_path_index
