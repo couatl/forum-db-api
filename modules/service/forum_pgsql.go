@@ -559,41 +559,67 @@ func (dbManager ForumPgSQL) ThreadGetPosts(params operations.ThreadGetPostsParam
 		execTime(start, `tree GetPosts`)
 	}
 	if *params.Sort == "parent_tree" {
-		query += ` JOIN (SELECT id FROM posts WHERE posts.thread = $1 AND posts.parent = 0`
+		parents := []ID{}
+
+		parentQuery := `SELECT id FROM posts WHERE posts.thread = $1 AND posts.parent = 0`
+		query += ` WHERE thread = $1 AND root_id = $2`
+
+		//query += ` JOIN (SELECT id FROM posts WHERE posts.thread = $1 AND posts.parent = 0`
 		if params.Since != nil {
 			if desc {
-				query += ` AND root_id < (SELECT root_id FROM posts WHERE id = $2)`
+				query += ` AND root_id < (SELECT root_id FROM posts WHERE id = ` + strconv.FormatInt(*params.Since, 10) + `)`
+				parentQuery += ` AND root_id < (SELECT root_id FROM posts WHERE id = ` + strconv.FormatInt(*params.Since, 10) + `)`
+
+				//query += ` AND root_id < (SELECT root_id FROM posts WHERE id = $2)`
 			} else {
-				query += ` AND root_id > (SELECT root_id FROM posts WHERE id = $2)`
+				query += ` AND root_id > (SELECT root_id FROM posts WHERE id = ` + strconv.FormatInt(*params.Since, 10) + `)`
+				parentQuery += ` AND root_id > (SELECT root_id FROM posts WHERE id = ` + strconv.FormatInt(*params.Since, 10) + `)`
+
+				//query += ` AND root_id > (SELECT root_id FROM posts WHERE id = $2)`
 			}
 		}
 
-		limitStr := ""
-		if params.Limit != nil {
-			limitStr = ` LIMIT ` + limit
-		}
+		// limitStr := ""
+		// if params.Limit != nil {
+		// 	limitStr = ` LIMIT ` + limit
+		// }
 
 		if desc {
-			query += ` ORDER BY id DESC ` + limitStr + `) selectedParents ON (root_id = selectedParents.id) ORDER BY path DESC`
+			query += ` ORDER BY path DESC, id DESC`
+			parentQuery += ` ORDER BY id DESC`
+
+			// query += ` ORDER BY id DESC ` + limitStr + `) selectedParents ON (root_id = selectedParents.id) ORDER BY path DESC`
 		} else {
-			query += ` ORDER BY id ` + limitStr + `) selectedParents ON (root_id = selectedParents.id) ORDER BY path`
+			query += ` ORDER BY path, id`
+			parentQuery += ` ORDER BY id`
+
+			// query += ` ORDER BY id ` + limitStr + `) selectedParents ON (root_id = selectedParents.id) ORDER BY path`
 		}
 
-		if params.Since != nil {
-			err := tx.Select(&posts, query, threadID.ID, params.Since)
-			if err != nil {
-				log.Println(err)
-				tx.Rollback()
-				return operations.NewThreadGetPostsNotFound().WithPayload(&models.Error{Message: ERR})
-			}
-		} else {
-			err := tx.Select(&posts, query, threadID.ID)
-			if err != nil {
-				log.Println(err)
-				tx.Rollback()
-				return operations.NewThreadGetPostsNotFound().WithPayload(&models.Error{Message: ERR})
-			}
+		if params.Limit != nil {
+			parentQuery += ` LIMIT ` + limit
 		}
+
+		errParent := tx.Select(&parents, parentQuery, threadID.ID)
+		if errParent != nil {
+			log.Println(errParent)
+			tx.Rollback()
+			return operations.NewThreadGetPostsNotFound().WithPayload(&models.Error{Message: ERR})
+		}
+
+		subPosts := models.Posts{}
+		stmtPost, errNotFound := tx.Preparex(query)
+		for _, parent := range parents {
+
+			errNotFound = stmtPost.Select(&subPosts, threadID.ID, parent.ID)
+			if errNotFound != nil {
+				log.Println(errNotFound)
+				tx.Rollback()
+				return operations.NewThreadGetPostsNotFound().WithPayload(&models.Error{Message: ERR})
+			}
+			posts = append(posts, subPosts...)
+		}
+
 		execTime(start, `parent tree GetPosts`)
 	}
 
