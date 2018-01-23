@@ -46,21 +46,21 @@ DROP TABLE IF EXISTS users;
 CREATE TABLE IF NOT EXISTS users (
   id       BIGSERIAL NOT NULL PRIMARY KEY,
   about    TEXT,
-  email    TEXT UNIQUE NOT NULL,
+  email    TEXT NOT NULL,
   fullname VARCHAR(64) NOT NULL,
   nickname TEXT UNIQUE NOT NULL
 );
 CREATE UNIQUE INDEX IF NOT EXISTS users_nickname_index
   ON users (lower(nickname));
-CREATE INDEX IF NOT EXISTS users_email_nickname_index
-  ON users (lower(email), lower(nickname));
+CREATE UNIQUE INDEX IF NOT EXISTS users_email_index
+  ON users (lower(email));
 CREATE INDEX IF NOT EXISTS users_nickname_id_asc_index
   ON users (id, lower(nickname));
 
 -- +migrate Up
 CREATE TABLE IF NOT EXISTS forums (
   id      BIGSERIAL NOT NULL PRIMARY KEY,
-  slug    TEXT UNIQUE NOT NULL,
+  slug    TEXT NOT NULL,
   author  TEXT,
   title   VARCHAR(255) NOT NULL,
   posts   BIGINT  DEFAULT 0,
@@ -86,14 +86,10 @@ CREATE INDEX IF NOT EXISTS threads_slug_index
   ON threads (lower(slug));
 CREATE INDEX IF NOT EXISTS threads_forum_id_index
   ON threads (forum_id);
-CREATE INDEX IF NOT EXISTS threads_forum_index
-  ON threads (forum);
 CREATE INDEX IF NOT EXISTS threads_forum_created_index
-  ON threads (forum, created DESC);
+  ON threads (forum_id, created);
 CREATE INDEX IF NOT EXISTS threads_created_index
   ON threads (created);
-CREATE INDEX IF NOT EXISTS threads_author_index
-  ON threads (author);
 
 -- +migrate Up
 CREATE TABLE IF NOT EXISTS posts (
@@ -163,3 +159,5 @@ CREATE TABLE IF NOT EXISTS forum_users (
 );
 CREATE INDEX forum_users_slug_index
   ON forum_users (forum_id);
+CREATE UNIQUE INDEX forum_users_author_slug_index
+  ON forum_users (forum_id, author_id);
