@@ -110,17 +110,9 @@ CREATE INDEX IF NOT EXISTS posts_thread_path_index
   ON posts (thread, path);
 CREATE INDEX IF NOT EXISTS posts_thread_id_index
   ON posts (thread, id);
-CREATE INDEX IF NOT EXISTS posts_path_index
-  ON posts (path);
-CREATE INDEX IF NOT EXISTS posts_parent_index
-  ON posts (parent);
-CREATE INDEX IF NOT EXISTS posts_root_id_index
-  ON posts (root_id);
 CREATE INDEX IF NOT EXISTS post_thread_id_parent_root_index
-  ON posts (thread, id, root_id)
+  ON posts (thread, root_id)
   WHERE parent = 0;
-CREATE INDEX IF NOT EXISTS posts_thread_parent_index
-  ON posts (id, root_id);
 
 -- +migrate StatementBegin
 CREATE OR REPLACE FUNCTION update_parent_path() RETURNS TRIGGER AS
