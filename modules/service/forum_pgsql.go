@@ -592,7 +592,6 @@ func (dbManager ForumPgSQL) ThreadGetPosts(params operations.ThreadGetPostsParam
 				return operations.NewThreadGetPostsNotFound().WithPayload(&models.Error{Message: ERR})
 			}
 		}
-		log.Println(`parent tree`)
 	}
 
 	execTime(start, `GetPosts`)
