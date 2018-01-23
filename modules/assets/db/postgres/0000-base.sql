@@ -158,6 +158,14 @@ CREATE TABLE IF NOT EXISTS forum_users (
   author_id  BIGINT,
   forum_id   BIGINT
 );
+-- CREATE TABLE IF NOT EXISTS forum_users (
+--   author_id  BIGINT,
+--   forum_id   BIGINT,
+--   about      TEXT,
+--   email      TEXT,
+--   fullname   VARCHAR(64),
+--   nickname   TEXT
+-- );
 CREATE INDEX forum_users_forum_index
   ON forum_users (forum_id);
 CREATE INDEX forum_users_author_index
