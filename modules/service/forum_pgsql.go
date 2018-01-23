@@ -462,14 +462,14 @@ func (dbManager ForumPgSQL) ThreadGetOne(params operations.ThreadGetOneParams) m
 		errNotFound := tx.Get(&thread, querySlugID, slug)
 		if errNotFound != nil {
 			tx.Rollback()
-			return operations.NewThreadGetPostsNotFound().WithPayload(&models.Error{Message: ERR_NOT_FOUND})
+			return operations.NewThreadGetOneNotFound().WithPayload(&models.Error{Message: ERR_NOT_FOUND})
 		}
 	} else {
 		querySlugID += ` id = $1`
 		errNotFound := tx.Get(&thread, querySlugID, id)
 		if errNotFound != nil {
 			tx.Rollback()
-			return operations.NewThreadGetPostsNotFound().WithPayload(&models.Error{Message: ERR_NOT_FOUND})
+			return operations.NewThreadGetOneNotFound().WithPayload(&models.Error{Message: ERR_NOT_FOUND})
 		}
 	}
 
@@ -503,13 +503,6 @@ func (dbManager ForumPgSQL) ThreadGetPosts(params operations.ThreadGetPostsParam
 			return operations.NewThreadGetPostsNotFound().WithPayload(&models.Error{Message: ERR_NOT_FOUND})
 		}
 	}
-
-	// errNotFound := tx.Get(&threadID, `SELECT id FROM threads WHERE lower(slug) = lower($1) OR id = $2`, slug, id)
-	// if errNotFound != nil {
-	// 	//log.Println(errNotFound)
-	// 	tx.Rollback()
-	// 	return operations.NewThreadGetPostsNotFound().WithPayload(&models.Error{Message: ERR_NOT_FOUND})
-	// }
 
 	query := `SELECT posts.id, forum, thread, author, created, is_edited as isEdited, message, parent FROM posts`
 
@@ -551,6 +544,7 @@ func (dbManager ForumPgSQL) ThreadGetPosts(params operations.ThreadGetPostsParam
 				return operations.NewThreadGetPostsNotFound().WithPayload(&models.Error{Message: ERR})
 			}
 		}
+		execTime(start, `flat GetPosts`)
 	}
 	if *params.Sort == "tree" {
 		query += ` WHERE thread = $1`
@@ -587,6 +581,7 @@ func (dbManager ForumPgSQL) ThreadGetPosts(params operations.ThreadGetPostsParam
 				return operations.NewThreadGetPostsNotFound().WithPayload(&models.Error{Message: ERR})
 			}
 		}
+		execTime(start, `tree GetPosts`)
 	}
 	if *params.Sort == "parent_tree" {
 		query += ` JOIN (SELECT id FROM posts WHERE posts.thread = $1 AND posts.parent = 0`
@@ -624,9 +619,9 @@ func (dbManager ForumPgSQL) ThreadGetPosts(params operations.ThreadGetPostsParam
 				return operations.NewThreadGetPostsNotFound().WithPayload(&models.Error{Message: ERR})
 			}
 		}
+		execTime(start, `parent tree GetPosts`)
 	}
 
-	execTime(start, `GetPosts`)
 	tx.Commit()
 	return operations.NewThreadGetPostsOK().WithPayload(posts)
 }

@@ -12,6 +12,7 @@ import (
 type ForumGeneric struct {
 	db *sqlx.DB
 }
+
 type DatabaseType struct {
 	Prefix      string
 	Description string
