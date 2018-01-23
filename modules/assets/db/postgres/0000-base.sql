@@ -2,34 +2,33 @@
 SET SYNCHRONOUS_COMMIT = 'off';
 DROP INDEX IF EXISTS users_nickname_index;
 DROP INDEX IF EXISTS users_email_index;
-DROP INDEX IF EXISTS users_email_nickname_index;
 DROP INDEX IF EXISTS users_nickname_id_index;
-DROP INDEX IF EXISTS users_nickname_id_asc_index;
 
 -- +migrate Up
 DROP INDEX IF EXISTS forums_low_slug_index;
 DROP INDEX IF EXISTS forums_slug_index;
+DROP INDEX IF EXISTS forum_users_slug_index;
 
 -- +migrate Up
 DROP INDEX IF EXISTS threads_slug_index;
 DROP INDEX IF EXISTS threads_forum_id_index;
-DROP INDEX IF EXISTS threads_forum_index;
 DROP INDEX IF EXISTS threads_created_index;
 DROP INDEX IF EXISTS threads_forum_created_index;
-DROP INDEX IF EXISTS threads_author_index;
 
 -- +migrate Up
 DROP INDEX IF EXISTS posts_thread_index;
+DROP INDEX IF EXISTS posts_path_index;
 DROP INDEX IF EXISTS posts_thread_path_index;
 DROP INDEX IF EXISTS posts_root_id_index;
 DROP INDEX IF EXISTS posts_thread_id_index;
+DROP INDEX IF EXISTS post_thread_id_parent_root_index;
 DROP INDEX IF EXISTS posts_thread_parent_index;
-DROP INDEX IF EXISTS posts_thread_parent_path_index;
 
 -- +migrate Up
 DROP INDEX IF EXISTS votes_user_thread_index;
 DROP INDEX IF EXISTS votes_thread_index;
-DROP INDEX IF EXISTS forum_users_slug_index;
+DROP INDEX IF EXISTS forum_users_forum_index;
+DROP INDEX IF EXISTS forum_users_author_index;
 
 -- +migrate Up
 DROP TRIGGER IF EXISTS parent_path_tgr ON posts;
@@ -54,7 +53,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS users_nickname_index
   ON users (lower(nickname));
 CREATE UNIQUE INDEX IF NOT EXISTS users_email_index
   ON users (lower(email));
-CREATE INDEX IF NOT EXISTS users_nickname_id_asc_index
+CREATE INDEX IF NOT EXISTS users_nickname_id_index
   ON users (id, lower(nickname));
 
 -- +migrate Up
@@ -106,18 +105,18 @@ CREATE TABLE IF NOT EXISTS posts (
 );
 CREATE INDEX IF NOT EXISTS posts_thread_index
   ON posts (thread);
-CREATE INDEX IF NOT EXISTS posts_thread_index
+CREATE INDEX IF NOT EXISTS posts_path_index
   ON posts (path);
-CREATE INDEX IF NOT EXISTS posts_thread_path_asc_index
+CREATE INDEX IF NOT EXISTS posts_thread_path_index
   ON posts (thread, path);
 CREATE INDEX IF NOT EXISTS posts_root_id_index
   ON posts (root_id);
-CREATE INDEX IF NOT EXISTS posts_thread_id_asc_index
+CREATE INDEX IF NOT EXISTS posts_thread_id_index
   ON posts (thread, id);
 CREATE INDEX IF NOT EXISTS post_thread_id_parent_root_index
   ON posts (thread, id, parent, root_id)
   WHERE parent = 0;
-CREATE INDEX IF NOT EXISTS posts_thread_parent_asc_index
+CREATE INDEX IF NOT EXISTS posts_thread_parent_index
   ON posts (id, root_id);
 
 -- +migrate StatementBegin
@@ -159,7 +158,9 @@ CREATE TABLE IF NOT EXISTS forum_users (
   author_id  BIGINT,
   forum_id   BIGINT
 );
-CREATE INDEX forum_users_slug_index
+CREATE INDEX forum_users_forum_index
   ON forum_users (forum_id);
-CREATE INDEX forum_users_slug_index
+CREATE INDEX forum_users_author_index
   ON forum_users (author_id);
+CREATE UNIQUE INDEX forum_users_author_forum_index
+  ON forum_users (author_id, forum_id);
