@@ -106,6 +106,8 @@ CREATE TABLE IF NOT EXISTS posts (
 );
 CREATE INDEX IF NOT EXISTS posts_thread_index
   ON posts (thread);
+CREATE INDEX IF NOT EXISTS posts_thread_index
+  ON posts (path);
 CREATE INDEX IF NOT EXISTS posts_thread_path_asc_index
   ON posts (thread, path);
 CREATE INDEX IF NOT EXISTS posts_root_id_index
@@ -159,5 +161,5 @@ CREATE TABLE IF NOT EXISTS forum_users (
 );
 CREATE INDEX forum_users_slug_index
   ON forum_users (forum_id);
-CREATE UNIQUE INDEX forum_users_author_slug_index
-  ON forum_users (forum_id, author_id);
+CREATE INDEX forum_users_slug_index
+  ON forum_users (author_id);
