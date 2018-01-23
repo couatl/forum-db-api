@@ -1,13 +1,19 @@
 FROM ubuntu:16.04
 
 RUN apt-get update
+RUN apt-get install -y wget git
 
-ENV PGVER 9.5
+ENV PGVER 9.6
+
+RUN apt-get install -y software-properties-common python-software-properties
+RUN add-apt-repository "deb http://apt.postgresql.org/pub/repos/apt/ xenial-pgdg main"
+RUN wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add -
+RUN apt-get update
 RUN apt-get install -y postgresql-$PGVER
 
+# RUN apt-get install -y postgresql-$PGVER
 # RUN apt-get install -y golang git
 
-RUN apt-get install -y wget git
 RUN wget https://storage.googleapis.com/golang/go1.9.2.linux-amd64.tar.gz
 RUN tar -C /usr/local -xzf go1.9.2.linux-amd64.tar.gz && mkdir go && mkdir go/src && mkdir go/bin && mkdir go/pkg
 
