@@ -44,7 +44,7 @@ DROP TABLE IF EXISTS users;
 
 -- +migrate Up
 CREATE TABLE IF NOT EXISTS users (
-  id       BIGSERIAL NOT NULL PRIMARY KEY,
+  id       SERIAL NOT NULL PRIMARY KEY,
   about    TEXT,
   email    TEXT NOT NULL,
   fullname VARCHAR(64) NOT NULL,
@@ -59,11 +59,11 @@ CREATE INDEX IF NOT EXISTS users_nickname_id_index
 
 -- +migrate Up
 CREATE TABLE IF NOT EXISTS forums (
-  id      BIGSERIAL NOT NULL PRIMARY KEY,
+  id      SERIAL NOT NULL PRIMARY KEY,
   slug    TEXT NOT NULL,
   author  TEXT,
   title   VARCHAR(255) NOT NULL,
-  posts   BIGINT  DEFAULT 0,
+  posts   INT  DEFAULT 0,
   threads INTEGER DEFAULT 0
 );
 CREATE UNIQUE INDEX IF NOT EXISTS forums_low_slug_index
@@ -73,8 +73,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS forums_low_slug_index
 CREATE TABLE IF NOT EXISTS threads (
   id        SERIAL PRIMARY KEY,
   forum     TEXT,
-  forum_id  BIGINT,
-  author_id BIGINT,
+  forum_id  INT,
+  author_id INT,
   author    TEXT,
   created   TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
   message   TEXT NOT NULL,
@@ -93,16 +93,16 @@ CREATE INDEX IF NOT EXISTS threads_created_index
 
 -- +migrate Up
 CREATE TABLE IF NOT EXISTS posts (
-  id        BIGSERIAL PRIMARY KEY,
+  id        SERIAL PRIMARY KEY,
   forum     TEXT,
-  thread    BIGINT,
+  thread    INT,
   author    TEXT,
   created   TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
   is_edited BOOLEAN NOT NULL DEFAULT FALSE,
   message   TEXT NOT NULL,
-  parent    BIGINT DEFAULT 0,
-  path      BIGINT [],
-  root_id   BIGINT
+  parent    INT DEFAULT 0,
+  path      INT [],
+  root_id   INT
 );
 CREATE INDEX IF NOT EXISTS posts_thread_index
   ON posts (thread);
@@ -110,8 +110,14 @@ CREATE INDEX IF NOT EXISTS posts_thread_path_index
   ON posts (thread, path);
 CREATE INDEX IF NOT EXISTS posts_thread_id_index
   ON posts (thread, id);
+CREATE INDEX IF NOT EXISTS posts_path_index
+  ON posts (path);
+CREATE INDEX IF NOT EXISTS posts_parent_index
+  ON posts (parent);
+CREATE INDEX IF NOT EXISTS posts_root_id_index
+  ON posts (root_id);
 CREATE INDEX IF NOT EXISTS post_thread_id_parent_root_index
-  ON posts (thread, id, parent, root_id)
+  ON posts (thread, id, root_id)
   WHERE parent = 0;
 CREATE INDEX IF NOT EXISTS posts_thread_parent_index
   ON posts (id, root_id);
@@ -142,7 +148,7 @@ FOR EACH ROW EXECUTE PROCEDURE update_parent_path();
 CREATE TABLE IF NOT EXISTS votes (
   id        SERIAL NOT NULL PRIMARY KEY,
   author    TEXT REFERENCES users (nickname),
-  thread    BIGINT,
+  thread    INT,
   voice     INTEGER NOT NULL
 );
 CREATE UNIQUE INDEX votes_user_thread_index
@@ -152,8 +158,8 @@ CREATE INDEX votes_thread_index
 
 -- +migrate Up
 CREATE TABLE IF NOT EXISTS forum_users (
-  author_id  BIGINT,
-  forum_id   BIGINT
+  author_id  INT,
+  forum_id   INT
 );
 CREATE INDEX forum_users_forum_index
   ON forum_users (forum_id);
