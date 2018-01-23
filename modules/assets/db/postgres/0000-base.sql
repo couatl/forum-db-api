@@ -106,14 +106,8 @@ CREATE TABLE IF NOT EXISTS posts (
 );
 CREATE INDEX IF NOT EXISTS posts_thread_index
   ON posts (thread);
-CREATE INDEX IF NOT EXISTS posts_path_index
-  ON posts (path);
-CREATE INDEX IF NOT EXISTS posts_parent_index
-  ON posts (parent);
 CREATE INDEX IF NOT EXISTS posts_thread_path_index
   ON posts (thread, path);
-CREATE INDEX IF NOT EXISTS posts_root_id_index
-  ON posts (root_id);
 CREATE INDEX IF NOT EXISTS posts_thread_id_index
   ON posts (thread, id);
 CREATE INDEX IF NOT EXISTS post_thread_id_parent_root_index

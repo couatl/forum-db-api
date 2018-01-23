@@ -472,13 +472,6 @@ func (dbManager ForumPgSQL) ThreadGetPosts(params operations.ThreadGetPostsParam
 		}
 	}
 
-	// errNotFound := tx.Get(&threadID, `SELECT id FROM threads WHERE lower(slug) = lower($1) OR id = $2`, slug, id)
-	// if errNotFound != nil {
-	// 	//log.Println(errNotFound)
-	// 	tx.Rollback()
-	// 	return operations.NewThreadGetPostsNotFound().WithPayload(&models.Error{Message: ERR_NOT_FOUND})
-	// }
-
 	query := `SELECT posts.id, forum, thread, author, created, is_edited as isEdited, message, parent FROM posts`
 
 	desc := params.Desc != nil && *params.Desc
@@ -559,67 +552,94 @@ func (dbManager ForumPgSQL) ThreadGetPosts(params operations.ThreadGetPostsParam
 		execTime(start, `tree GetPosts`)
 	}
 	if *params.Sort == "parent_tree" {
-		parents := []ID{}
-
-		parentQuery := `SELECT id FROM posts WHERE posts.thread = $1 AND posts.parent = 0`
-		query += ` WHERE thread = $1 AND root_id = $2`
-
-		//query += ` JOIN (SELECT id FROM posts WHERE posts.thread = $1 AND posts.parent = 0`
 		if params.Since != nil {
 			if desc {
-				query += ` AND root_id < (SELECT root_id FROM posts WHERE id = ` + strconv.FormatInt(*params.Since, 10) + `)`
-				parentQuery += ` AND root_id < (SELECT root_id FROM posts WHERE id = ` + strconv.FormatInt(*params.Since, 10) + `)`
-
-				//query += ` AND root_id < (SELECT root_id FROM posts WHERE id = $2)`
+				if params.Limit != nil {
+					query += ` JOIN (SELECT id FROM posts WHERE posts.parent = 0 AND posts.thread = $1
+						AND root_id < (SELECT root_id FROM posts WHERE id = ` +
+						strconv.FormatInt(*params.Since, 10) + `)` + ` ORDER BY id DESC LIMIT ` + limit +
+						`) selectedParents ON (root_id = selectedParents.id) ORDER BY path DESC`
+				} else {
+					query += ` JOIN (SELECT id FROM posts WHERE posts.parent = 0 AND posts.thread = $1
+						AND root_id < (SELECT root_id FROM posts WHERE id = ` +
+						strconv.FormatInt(*params.Since, 10) + `)` + ` ORDER BY id DESC` +
+						`) selectedParents ON (root_id = selectedParents.id) ORDER BY path DESC`
+				}
 			} else {
-				query += ` AND root_id > (SELECT root_id FROM posts WHERE id = ` + strconv.FormatInt(*params.Since, 10) + `)`
-				parentQuery += ` AND root_id > (SELECT root_id FROM posts WHERE id = ` + strconv.FormatInt(*params.Since, 10) + `)`
-
-				//query += ` AND root_id > (SELECT root_id FROM posts WHERE id = $2)`
+				if params.Limit != nil {
+					query += ` JOIN (SELECT id FROM posts WHERE posts.parent = 0 AND posts.thread = $1
+						AND root_id > (SELECT root_id FROM posts WHERE id = ` +
+						strconv.FormatInt(*params.Since, 10) + `)` + ` ORDER BY id LIMIT ` + limit +
+						`) selectedParents ON (root_id = selectedParents.id) ORDER BY path`
+				} else {
+					query += ` JOIN (SELECT id FROM posts WHERE posts.parent = 0 AND posts.thread = $1
+						AND root_id > (SELECT root_id FROM posts WHERE id = ` +
+						strconv.FormatInt(*params.Since, 10) + `)` + ` ORDER BY id` +
+						`) selectedParents ON (root_id = selectedParents.id) ORDER BY path`
+				}
+			}
+		} else {
+			if desc {
+				if params.Limit != nil {
+					query += ` JOIN (SELECT id FROM posts WHERE posts.parent = 0 AND posts.thread = $1` +
+						` ORDER BY id DESC LIMIT ` + limit + `) selectedParents ON (root_id = selectedParents.id) ORDER BY path DESC`
+				} else {
+					query += ` JOIN (SELECT id FROM posts WHERE posts.parent = 0 AND posts.thread = $1` +
+						` ORDER BY id DESC) selectedParents ON (root_id = selectedParents.id) ORDER BY path DESC`
+				}
+			} else {
+				if params.Limit != nil {
+					query += ` JOIN (SELECT id FROM posts WHERE posts.parent = 0 AND posts.thread = $1` +
+						` ORDER BY id LIMIT ` + limit + `) selectedParents ON (root_id = selectedParents.id) ORDER BY path`
+				} else {
+					query += ` JOIN (SELECT id FROM posts WHERE posts.parent = 0 AND posts.thread = $1` +
+						` ORDER BY id) selectedParents ON (root_id = selectedParents.id) ORDER BY path`
+				}
 			}
 		}
 
-		// limitStr := ""
-		// if params.Limit != nil {
-		// 	limitStr = ` LIMIT ` + limit
-		// }
-
-		if desc {
-			query += ` ORDER BY path DESC, id DESC`
-			parentQuery += ` ORDER BY id DESC`
-
-			// query += ` ORDER BY id DESC ` + limitStr + `) selectedParents ON (root_id = selectedParents.id) ORDER BY path DESC`
-		} else {
-			query += ` ORDER BY path, id`
-			parentQuery += ` ORDER BY id`
-
-			// query += ` ORDER BY id ` + limitStr + `) selectedParents ON (root_id = selectedParents.id) ORDER BY path`
-		}
-
-		if params.Limit != nil {
-			parentQuery += ` LIMIT ` + limit
-		}
-
-		errParent := tx.Select(&parents, parentQuery, threadID.ID)
-		if errParent != nil {
-			log.Println(errParent)
+		err := tx.Select(&posts, query, threadID.ID)
+		if err != nil {
+			log.Println(err)
 			tx.Rollback()
 			return operations.NewThreadGetPostsNotFound().WithPayload(&models.Error{Message: ERR})
 		}
 
-		subPosts := models.Posts{}
-		stmtPost, errNotFound := tx.Preparex(query)
-		for _, parent := range parents {
-
-			errNotFound = stmtPost.Select(&subPosts, threadID.ID, parent.ID)
-			if errNotFound != nil {
-				log.Println(errNotFound)
-				tx.Rollback()
-				return operations.NewThreadGetPostsNotFound().WithPayload(&models.Error{Message: ERR})
-			}
-			posts = append(posts, subPosts...)
-		}
-
+		// query += ` JOIN (SELECT id FROM posts WHERE posts.thread = $1 AND posts.parent = 0`
+		// if params.Since != nil {
+		// 	if desc {
+		// 		query += ` AND root_id < (SELECT root_id FROM posts WHERE id = $2)`
+		// 	} else {
+		// 		query += ` AND root_id > (SELECT root_id FROM posts WHERE id = $2)`
+		// 	}
+		// }
+		//
+		// limitStr := ""
+		// if params.Limit != nil {
+		// 	limitStr = ` LIMIT ` + limit
+		// }
+		//
+		// if desc {
+		// 	query += ` ORDER BY id DESC ` + limitStr + `) selectedParents ON (root_id = selectedParents.id) ORDER BY path DESC`
+		// } else {
+		// 	query += ` ORDER BY id ` + limitStr + `) selectedParents ON (root_id = selectedParents.id) ORDER BY path`
+		// }
+		//
+		// if params.Since != nil {
+		// 	err := tx.Select(&posts, query, threadID.ID, params.Since)
+		// 	if err != nil {
+		// 		log.Println(err)
+		// 		tx.Rollback()
+		// 		return operations.NewThreadGetPostsNotFound().WithPayload(&models.Error{Message: ERR})
+		// 	}
+		// } else {
+		// 	err := tx.Select(&posts, query, threadID.ID)
+		// 	if err != nil {
+		// 		log.Println(err)
+		// 		tx.Rollback()
+		// 		return operations.NewThreadGetPostsNotFound().WithPayload(&models.Error{Message: ERR})
+		// 	}
+		// }
 		execTime(start, `parent tree GetPosts`)
 	}
 
