@@ -25,9 +25,6 @@ type ID struct {
 type userID struct {
 	ID       int64  `db:"id"`
 	Nickname string `db:"nickname"`
-	// Fullname string `db:"fullname"`
-	// About    string `db:"about"`
-	// Email    strfmt.Email `db:"email"`
 }
 
 type forumID struct {
@@ -158,9 +155,6 @@ func (dbManager ForumPgSQL) ForumGetUsers(params operations.ForumGetUsersParams)
 		return operations.NewForumGetUsersNotFound().WithPayload(&models.Error{Message: ERR_NOT_FOUND})
 	}
 
-	// query := `SELECT about, email, fullname, nickname FROM forum_users
-	// WHERE forum_id = $1`
-
 	query := `SELECT about, email, fullname, nickname FROM users
 	WHERE users.id IN (SELECT author_id FROM forum_users WHERE forum_id = $1)`
 
@@ -246,8 +240,7 @@ func (dbManager ForumPgSQL) PostGetOne(params operations.PostGetOneParams) middl
 		}
 		if item == "thread" {
 			thread := models.Thread{}
-			errUnexpected3 := tx.Get(&thread, `SELECT forum, author, created, message, title, slug, id, votes
-				 FROM threads WHERE id = $1`, post.Thread)
+			errUnexpected3 := tx.Get(&thread, `SELECT forum, author, created, message, title, slug, id, votes FROM threads WHERE id = $1`, post.Thread)
 
 			if errUnexpected3 != nil {
 				log.Println(errUnexpected3)
@@ -317,8 +310,6 @@ func (dbManager ForumPgSQL) PostsCreate(params operations.PostsCreateParams) mid
 	checkParent := "SELECT id FROM posts WHERE thread = $1 AND id = $2"
 	checkUser := "SELECT nickname, id FROM users WHERE lower(nickname) = lower($1)"
 
-	//checkUser := "SELECT nickname, id, about, email, fullname FROM users WHERE lower(nickname) = lower($1)"
-
 	insertPosts := `INSERT INTO posts (forum, thread, author, message, parent) VALUES
 	($1, $2, $3, $4, $5) RETURNING author, created, forum, id, is_edited as isEdited, message, thread, parent;`
 
@@ -356,16 +347,10 @@ func (dbManager ForumPgSQL) PostsCreate(params operations.PostsCreateParams) mid
 	}
 
 	insertForumUsers := "INSERT INTO forum_users (author_id, forum_id) VALUES"
-	//insertForumUsers := "INSERT INTO forum_users (author_id, forum_id, email, about, fullname, nickname) VALUES"
-
 	for idx, _ := range params.Posts {
 		if idx > 0 {
 			insertForumUsers += ","
 		}
-		// insertForumUsers += " (" + strconv.FormatInt(users[idx].ID, 10) + ", " + strconv.FormatInt(forumID.ID, 10) + ", " +
-		//  users[idx].Email + ", " + users[idx].About + ", " +
-		//  users[idx].Fullname + ", " + users[idx].Nickname + ") "
-
 		insertForumUsers += " (" + strconv.FormatInt(users[idx].ID, 10) + ", " + strconv.FormatInt(forumID.ID, 10) + ") "
 	}
 	insertForumUsers += " ON CONFLICT(author_id, forum_id) DO NOTHING;"
@@ -402,10 +387,6 @@ func (dbManager ForumPgSQL) ThreadCreate(params operations.ThreadCreateParams) m
 	user := userID{}
 
 	errNotFound := tx.Get(&forum, `SELECT slug, id FROM forums WHERE lower(slug) = lower($1)`, params.Slug)
-
-	// errNotFound2 := tx.Get(&user, `SELECT nickname, id, about, email, fullname, nickname
-	// 	 FROM users WHERE lower(nickname) = lower($1)`, params.Thread.Author)
-
 	errNotFound2 := tx.Get(&user, `SELECT nickname, id FROM users WHERE lower(nickname) = lower($1)`, params.Thread.Author)
 	if errNotFound != nil || errNotFound2 != nil {
 		tx.Rollback()
@@ -429,21 +410,8 @@ func (dbManager ForumPgSQL) ThreadCreate(params operations.ThreadCreateParams) m
 		return operations.NewThreadCreateNotFound().WithPayload(&models.Error{Message: ERR})
 	}
 
-	_, errUpdate := tx.Exec("UPDATE forums SET threads = threads + 1 WHERE id = $1", forum.ID)
-	if errUpdate != nil {
-		log.Println(errUpdate)
-		tx.Rollback()
-		return operations.NewThreadCreateNotFound().WithPayload(&models.Error{Message: ERR})
-	}
-	_, errUpdate = tx.Exec("INSERT INTO forum_users (author_id, forum_id) VALUES ($1, $2) ON CONFLICT(forum_id, author_id) DO NOTHING", user.ID, forum.ID)
-	if errUpdate != nil {
-		log.Println(errUpdate)
-		tx.Rollback()
-		return operations.NewThreadCreateNotFound().WithPayload(&models.Error{Message: ERR})
-	}
-
-	// tx.MustExec("INSERT INTO forum_users (author_id, forum_id, email, about, fullname, nickname)
-	//  VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT(forum_id, author_id) DO NOTHING", user.ID, forum.ID, user.Email, user.About, user.Fullname, user.Nickname)
+	tx.MustExec("UPDATE forums SET threads = threads + 1 WHERE id = $1", forum.ID)
+	tx.MustExec("INSERT INTO forum_users (author_id, forum_id) VALUES ($1, $2) ON CONFLICT(forum_id, author_id) DO NOTHING", user.ID, forum.ID)
 
 	tx.Commit()
 	return operations.NewThreadCreateCreated().WithPayload(&thread)
@@ -462,14 +430,14 @@ func (dbManager ForumPgSQL) ThreadGetOne(params operations.ThreadGetOneParams) m
 		errNotFound := tx.Get(&thread, querySlugID, slug)
 		if errNotFound != nil {
 			tx.Rollback()
-			return operations.NewThreadGetOneNotFound().WithPayload(&models.Error{Message: ERR_NOT_FOUND})
+			return operations.NewThreadGetPostsNotFound().WithPayload(&models.Error{Message: ERR_NOT_FOUND})
 		}
 	} else {
 		querySlugID += ` id = $1`
 		errNotFound := tx.Get(&thread, querySlugID, id)
 		if errNotFound != nil {
 			tx.Rollback()
-			return operations.NewThreadGetOneNotFound().WithPayload(&models.Error{Message: ERR_NOT_FOUND})
+			return operations.NewThreadGetPostsNotFound().WithPayload(&models.Error{Message: ERR_NOT_FOUND})
 		}
 	}
 
@@ -503,6 +471,13 @@ func (dbManager ForumPgSQL) ThreadGetPosts(params operations.ThreadGetPostsParam
 			return operations.NewThreadGetPostsNotFound().WithPayload(&models.Error{Message: ERR_NOT_FOUND})
 		}
 	}
+
+	// errNotFound := tx.Get(&threadID, `SELECT id FROM threads WHERE lower(slug) = lower($1) OR id = $2`, slug, id)
+	// if errNotFound != nil {
+	// 	//log.Println(errNotFound)
+	// 	tx.Rollback()
+	// 	return operations.NewThreadGetPostsNotFound().WithPayload(&models.Error{Message: ERR_NOT_FOUND})
+	// }
 
 	query := `SELECT posts.id, forum, thread, author, created, is_edited as isEdited, message, parent FROM posts`
 

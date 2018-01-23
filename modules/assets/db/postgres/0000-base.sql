@@ -23,6 +23,7 @@ DROP INDEX IF EXISTS posts_root_id_index;
 DROP INDEX IF EXISTS posts_thread_id_index;
 DROP INDEX IF EXISTS post_thread_id_parent_root_index;
 DROP INDEX IF EXISTS posts_thread_parent_index;
+DROP INDEX IF  EXISTS posts_parent_index;
 
 -- +migrate Up
 DROP INDEX IF EXISTS votes_user_thread_index;
@@ -100,14 +101,14 @@ CREATE TABLE IF NOT EXISTS posts (
   is_edited BOOLEAN NOT NULL DEFAULT FALSE,
   message   TEXT NOT NULL,
   parent    BIGINT DEFAULT 0,
-  path      INT [],
-  root_id   INT
+  path      BIGINT [],
+  root_id   BIGINT
 );
 CREATE INDEX IF NOT EXISTS posts_thread_index
   ON posts (thread);
 CREATE INDEX IF NOT EXISTS posts_path_index
   ON posts (path);
-CREATE INDEX IF NOT EXISTS posts_path_index
+CREATE INDEX IF NOT EXISTS posts_parent_index
   ON posts (parent);
 CREATE INDEX IF NOT EXISTS posts_thread_path_index
   ON posts (thread, path);
@@ -160,14 +161,6 @@ CREATE TABLE IF NOT EXISTS forum_users (
   author_id  BIGINT,
   forum_id   BIGINT
 );
--- CREATE TABLE IF NOT EXISTS forum_users (
---   author_id  BIGINT,
---   forum_id   BIGINT,
---   about      TEXT,
---   email      TEXT,
---   fullname   VARCHAR(64),
---   nickname   TEXT
--- );
 CREATE INDEX forum_users_forum_index
   ON forum_users (forum_id);
 CREATE INDEX forum_users_author_index
