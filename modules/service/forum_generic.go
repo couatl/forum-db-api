@@ -12,13 +12,6 @@ import (
 type ForumGeneric struct {
 	db *sqlx.DB
 }
-
-type Post struct {
-	ID          int64  `db:"id"`
-	Description string `db:"description"`
-	Completed   bool   `db:"completed"`
-}
-
 type DatabaseType struct {
 	Prefix      string
 	Description string

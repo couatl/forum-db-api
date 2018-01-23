@@ -4,15 +4,12 @@ import (
 	"crypto/tls"
 	"log"
 	"net/http"
-	"strings"
 
-	recover "github.com/dre1080/recover"
-	assetfs "github.com/elazarl/go-bindata-assetfs"
+	"github.com/dre1080/recover"
 	errors "github.com/go-openapi/errors"
 	runtime "github.com/go-openapi/runtime"
 	graceful "github.com/tylerb/graceful"
 
-	"github.com/couatl/forum-db-api/modules/assets/assets_ui"
 	"github.com/couatl/forum-db-api/modules/service"
 	"github.com/couatl/forum-db-api/restapi/operations"
 	"github.com/go-openapi/swag"
@@ -100,14 +97,14 @@ func uiMiddleware(handler http.Handler) http.Handler {
 		if r.URL.Path == "/api/" {
 			r.URL.Path = "/api"
 		}
-		if r.URL.Path != "/api" && !strings.HasPrefix(r.URL.Path, "/api/") {
-			http.FileServer(&assetfs.AssetFS{
-				Asset:     assets_ui.Asset,
-				AssetDir:  assets_ui.AssetDir,
-				AssetInfo: assets_ui.AssetInfo,
-			}).ServeHTTP(w, r)
-			return
-		}
+		// if r.URL.Path != "/api" && !strings.HasPrefix(r.URL.Path, "/api/") {
+		// 	http.FileServer(&assetfs.AssetFS{
+		// 		Asset:     assets_ui.Asset,
+		// 		AssetDir:  assets_ui.AssetDir,
+		// 		AssetInfo: assets_ui.AssetInfo,
+		// 	}).ServeHTTP(w, r)
+		// 	return
+		// }
 		handler.ServeHTTP(w, r)
 	})
 }
