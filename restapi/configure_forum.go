@@ -16,7 +16,6 @@ import (
 )
 
 //go:generate swagger generate server --target .. --name forum --spec ../swagger.yml
-//go:generate go-bindata -pkg assets_ui -o ../modules/assets/assets_ui/assets_ui.go -prefix ../swagger-ui/ ../swagger-ui/...
 //go:generate go-bindata -pkg assets_db -o ../modules/assets/assets_db/assets_db.go -prefix ../modules/assets/ ../modules/assets/...
 
 type DatabaseFlags struct {
