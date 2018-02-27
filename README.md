@@ -5,7 +5,7 @@
 * Сервис использует PostgreSQL 9.6
 
 ## Сборка и запуск Docker-контейнеров
-Docker контейнера организованы по следующему приципу:
+В контейнере:
 
  * Приложение:
    * использует и объявляет порт 5000 (http);
@@ -19,21 +19,17 @@ docker build -t forum-db-api -f Dockerfile .
 docker run -p 5000:5000 --name forum forum-db-api
 ```
 
-Остановить контейнер можно командой:
-```bash
-docker kill forum
-```
-
 ## Сборка и запуск
 Установить пакеты:
 ```bash
-go install ./vendor/github.com/go-swagger/go-swagger/cmd/swagger
-go install ./vendor/github.com/jteeuwen/go-bindata/go-bindata
+go get github.com/golang/dep/cmd/dep
+dep ensure
 ```
 
-Затем:
+Затем для запуска скриптов:
 ```bash
-go generate -x ./restapi
-go install ./cmd/forum-server
-forum-server --scheme=http --port=5000 --host=0.0.0.0 --database=postgres://username:password@localhost/db_name?sslmode=disable
+chmod +x ./build
+chmod +x ./run
+./build
+./run -u username -p password -u localhost(default) -d db_name
 ```
