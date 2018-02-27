@@ -1,0 +1,30 @@
+#!/bin/bash
+
+usage="Forum rest api.
+
+    -u  username to connect to PostgreSQL server
+    -p  password
+    -d  database name to connect to
+    -u  host (default is localhost)"
+
+while getopts "u:p:hd:" opt; do
+    case "$opt" in
+      u) username=$OPTARG
+         ;;
+      h) echo "$usage"
+         exit
+         ;;
+      p) password=$OPTARG
+        ;;
+      d) database_name=$OPTARG
+        ;;
+      u) host_opt=$OPTARG
+        ;;
+    esac
+done
+
+host=${host_opt:-localhost}
+
+echo "Connecting to $username:$password@$host/$database_name..."
+
+forum-server --scheme=http --port=5000 --host=0.0.0.0 --database=postgres://$username:$password@$host/$database_name?sslmode=disable

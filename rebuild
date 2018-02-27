@@ -1,0 +1,4 @@
+#!/bin/bash
+
+go generate -x ./restapi
+go install ./cmd/forum-server
