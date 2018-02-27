@@ -96,14 +96,6 @@ func uiMiddleware(handler http.Handler) http.Handler {
 		if r.URL.Path == "/api/" {
 			r.URL.Path = "/api"
 		}
-		// if r.URL.Path != "/api" && !strings.HasPrefix(r.URL.Path, "/api/") {
-		// 	http.FileServer(&assetfs.AssetFS{
-		// 		Asset:     assets_ui.Asset,
-		// 		AssetDir:  assets_ui.AssetDir,
-		// 		AssetInfo: assets_ui.AssetInfo,
-		// 	}).ServeHTTP(w, r)
-		// 	return
-		// }
 		handler.ServeHTTP(w, r)
 	})
 }
