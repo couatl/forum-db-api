@@ -50,6 +50,9 @@ ENV PATH $GOPATH/bin:/usr/local/go/bin:$PATH
 WORKDIR $GOPATH/src/github.com/couatl/forum-db-api
 ADD . $GOPATH/src/github.com/couatl/forum-db-api
 
+RUN go get -u github.com/golang/dep/cmd/dep
+RUN dep ensure
+
 RUN go install ./vendor/github.com/go-swagger/go-swagger/cmd/swagger
 RUN go install ./vendor/github.com/jteeuwen/go-bindata/go-bindata
 
