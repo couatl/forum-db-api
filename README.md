@@ -18,6 +18,11 @@
 docker build -t forum-db-api -f Dockerfile .
 docker run -p 5000:5000 --name forum forum-db-api
 ```
+Можно воспользоваться скриптом:
+```bash
+chmod +x scripts/docker_run
+scripts/docker_run
+```
 
 ## Сборка и запуск
 Установить пакеты:
@@ -28,8 +33,8 @@ dep ensure
 
 Затем для запуска скриптов:
 ```bash
-chmod +x ./build
-chmod +x ./run
+chmod +x scripts/build
+chmod +x scripts/run
 ./build
 ./run -u username -p password -u localhost(default) -d db_name
 ```
