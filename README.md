@@ -31,8 +31,10 @@ go get github.com/golang/dep/cmd/dep
 dep ensure
 ```
 
-Запуск:
+Сборка и запуск:
 ```bash
+go generate -x ./restapi
+go install ./cmd/forum-server
 forum-server --scheme=http --port=5000 --host=0.0.0.0 --database=postgres://username:password@host/database_name?sslmode=disable
 ```
 
