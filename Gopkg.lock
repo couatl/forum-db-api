@@ -33,12 +33,6 @@
 
 [[projects]]
   branch = "master"
-  name = "github.com/elazarl/go-bindata-assetfs"
-  packages = ["."]
-  revision = "30f82fa23fd844bd5bb1e5f216db87fd77b5eb43"
-
-[[projects]]
-  branch = "master"
   name = "github.com/facebookgo/stack"
   packages = ["."]
   revision = "751773369052141c013c6e827a71e8f35c07879c"
@@ -170,6 +164,12 @@
   revision = "7cafcd837844e784b526369c9bce262804aebc60"
 
 [[projects]]
+  branch = "master"
+  name = "github.com/lib/pq"
+  packages = [".","oid"]
+  revision = "88edab0803230a3898347e77b474f8c1820a1f20"
+
+[[projects]]
   name = "github.com/magiconair/properties"
   packages = ["."]
   revision = "be5ece7dd465ab0765a9682137865547526d1dfb"
@@ -298,6 +298,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "f5e3fb8df31852310b1fa3ec288a81034c3a7cb7faf77e94d5b0a55db61f5844"
+  inputs-digest = "60e226c2d571a563feb69117fd4887e108a6e24bdfde4f034a77f45192f52057"
   solver-name = "gps-cdcl"
   solver-version = 1
