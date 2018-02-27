@@ -5,7 +5,7 @@ import (
 	"github.com/go-openapi/runtime/middleware"
 )
 
-// ForumHandler ...
+// ForumHandler:			Handles database queries.
 type ForumHandler interface {
 	Clear(params operations.ClearParams) middleware.Responder
 	Status(params operations.StatusParams) middleware.Responder
