@@ -40,10 +40,6 @@ required = [
 
 [[constraint]]
   branch = "master"
-  name = "github.com/elazarl/go-bindata-assetfs"
-
-[[constraint]]
-  branch = "master"
   name = "github.com/go-openapi/errors"
 
 [[constraint]]
@@ -68,23 +64,11 @@ required = [
 
 [[constraint]]
   branch = "master"
-  name = "github.com/go-openapi/validate"
-
-[[constraint]]
-  name = "github.com/jessevdk/go-flags"
-  version = "1.3.0"
-
-[[constraint]]
-  branch = "master"
   name = "github.com/jmoiron/sqlx"
 
 [[constraint]]
   branch = "master"
   name = "github.com/lib/pq"
-
-[[constraint]]
-  name = "github.com/mattn/go-sqlite3"
-  version = "1.2.0"
 
 [[constraint]]
   branch = "master"
@@ -93,7 +77,3 @@ required = [
 [[constraint]]
   name = "github.com/tylerb/graceful"
   version = "1.2.15"
-
-[[constraint]]
-  name = "github.com/gorilla/mux"
-  version = "1.6.0"
