@@ -31,7 +31,12 @@ go get github.com/golang/dep/cmd/dep
 dep ensure
 ```
 
-Затем для запуска скриптов:
+Запуск:
+```bash
+forum-server --scheme=http --port=5000 --host=0.0.0.0 --database=postgres://username:password@host/database_name?sslmode=disable
+```
+
+Со скриптами:
 ```bash
 chmod +x scripts/build
 chmod +x scripts/run
