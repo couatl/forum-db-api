@@ -3,7 +3,6 @@ package service
 import (
 	"log"
 	"strconv"
-	"time"
 
 	"github.com/couatl/forum-db-api/models"
 	"github.com/couatl/forum-db-api/restapi/operations"
@@ -140,14 +139,12 @@ func (dbManager ForumPgSQL) ForumGetThreads(params operations.ForumGetThreadsPar
 	return operations.NewForumGetThreadsOK().WithPayload(threads)
 }
 
-//ForumGetUsers ... !OPTIMIZ
+//ForumGetUsers ...
 func (dbManager ForumPgSQL) ForumGetUsers(params operations.ForumGetUsersParams) middleware.Responder {
 	tx := dbManager.db.MustBegin()
 
 	forum := forumID{}
 	users := models.Users{}
-
-	start := time.Now()
 
 	err := tx.Get(&forum, `SELECT slug, id FROM forums WHERE lower(slug) = lower($1)`, params.Slug)
 	if err != nil {
@@ -190,7 +187,6 @@ func (dbManager ForumPgSQL) ForumGetUsers(params operations.ForumGetUsersParams)
 		}
 	}
 
-	execTime(start, `GetUsers`)
 	tx.Commit()
 	return operations.NewForumGetUsersOK().WithPayload(users)
 }
@@ -452,8 +448,6 @@ func (dbManager ForumPgSQL) ThreadGetPosts(params operations.ThreadGetPostsParam
 	threadID := ID{}
 	posts := models.Posts{}
 
-	start := time.Now()
-
 	slug, id := SlugID(params.SlugOrID)
 	querySlugID := `SELECT id FROM threads WHERE `
 	if id == -1 {
@@ -512,7 +506,6 @@ func (dbManager ForumPgSQL) ThreadGetPosts(params operations.ThreadGetPostsParam
 				return operations.NewThreadGetPostsNotFound().WithPayload(&models.Error{Message: ERR})
 			}
 		}
-		execTime(start, `flat GetPosts`)
 	}
 	if *params.Sort == "tree" {
 		query += ` WHERE thread = $1`
@@ -549,7 +542,6 @@ func (dbManager ForumPgSQL) ThreadGetPosts(params operations.ThreadGetPostsParam
 				return operations.NewThreadGetPostsNotFound().WithPayload(&models.Error{Message: ERR})
 			}
 		}
-		execTime(start, `tree GetPosts`)
 	}
 	if *params.Sort == "parent_tree" {
 		if params.Since != nil {
@@ -604,7 +596,6 @@ func (dbManager ForumPgSQL) ThreadGetPosts(params operations.ThreadGetPostsParam
 			tx.Rollback()
 			return operations.NewThreadGetPostsNotFound().WithPayload(&models.Error{Message: ERR})
 		}
-		execTime(start, `parent tree GetPosts`)
 	}
 
 	tx.Commit()
@@ -789,9 +780,4 @@ func SlugID(slugOrID string) (string, int64) {
 		id = -1
 	}
 	return slug, id
-}
-
-func execTime(start time.Time, name string) {
-	elapsed := time.Since(start)
-	log.Println(elapsed.String() + ` ` + name)
 }
